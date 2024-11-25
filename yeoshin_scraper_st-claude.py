@@ -55,72 +55,80 @@ class YeoshinScraper:
         )
         
     def setup_driver(self):
-        try:
-            options = webdriver.ChromeOptions()
+    try:
+        options = webdriver.ChromeOptions()
+        # 성능 최적화 옵션들
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-extensions')  # 확장 프로그램 비활성화
+        options.add_argument('--disable-notifications')  # 알림 비활성화
+        options.add_argument('--disable-logging')  # 로깅 비활성화
+        options.add_argument('--disable-default-apps')  # 기본 앱 비활성화
+        options.add_argument('--disable-infobars')  # 정보 표시줄 비활성화
+        options.add_argument('--disable-blink-features=AutomationControlled')  # 자동화 감지 방지
+        options.add_argument('--start-maximized')  
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-popup-blocking')
+        options.add_argument('--blink-settings=imagesEnabled=false')  # 이미지 로딩 비활성화
+        options.add_argument('--window-size=1920,1080')
+        options.add_argument('--headless')  # Streamlit 환경에서 필요
+
+        # 메모리 관련 설정
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--no-zygote')
+        options.add_argument('--disable-accelerated-2d-canvas')
+        options.add_argument('--disable-webgl')
+
+        options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        
+        # Streamlit Cloud 환경일 때의 추가 설정
+        if 'STREAMLIT_CLOUD' in os.environ:
+            options.binary_location = '/usr/bin/chromium-browser'
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--start-maximized')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--disable-popup-blocking')
-            options.add_argument('--disable-features=NetworkService')
-            options.add_argument('--window-size=1920,1080')
-            options.add_argument('--headless')  # Streamlit 환경에서 필요
-            options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-            
-            # 성능 최적화 옵션들
-            options.add_argument('--disable-extensions')  # 확장 프로그램 비활성화
-            options.add_argument('--disable-notifications')  # 알림 비활성화
-            options.add_argument('--disable-logging')  # 로깅 비활성화
-            options.add_argument('--disable-default-apps')  # 기본 앱 비활성화
-            options.add_argument('--blink-settings=imagesEnabled=false')  # 이미지 로딩 비활성화
-            options.add_argument('--disable-infobars')  # 정보 표시줄 비활성화
-            options.add_argument('--disable-blink-features=AutomationControlled')  # 자동화 감지 방지
-            
-            # 메모리 관련 설정
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--no-zygote')
-            options.add_argument('--disable-accelerated-2d-canvas')
-            options.add_argument('--disable-webgl')
-            
-            options.page_load_strategy = 'eager'  # 필수 요소만 로드되면 진행
-            
-            service = Service()
+        
+        service = Service()
+        if 'STREAMLIT_CLOUD' in os.environ:
+            self.driver = webdriver.Chrome(options=options)
+        else:
+            service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=options)
-            self.driver.set_page_load_timeout(30)  # 페이지 로드 타임아웃 설정
-            self.wait = WebDriverWait(self.driver, 15)  # 기본 대기 시간 감소
-
-            # 빈 페이지 접속
-            self.driver.get("https://www.yeoshin.co.kr")
-            time.sleep(2)
-
-            # 로그인 관련 쿠키 설정
-            cookies = [
-                {"name": "LOGIN_INFO", "value": os.getenv("LOGIN_INFO")},
-                {"name": "HSID", "value": os.getenv("HSID")},
-                {"name": "SSID", "value": os.getenv("SSID")},
-                {"name": "APISID", "value": os.getenv("APISID")},
-                {"name": "SAPISID", "value": os.getenv("SAPISID")},
-                {"name": "SID", "value": os.getenv("SID")},
-                {"name": "_kau", "value": os.getenv("KAU")},
-                {"name": "_kahai", "value": os.getenv("KAHAI")},
-                {"name": "_karmt", "value": os.getenv("KARMT")},
-                {"name": "_kawlt", "value": os.getenv("KAWLT")},
-                {"name": "access_token", "value": os.getenv("ACCESS_TOKEN")}
-            ]
-
-            for cookie in cookies:
-                cookie.update({
-                    "domain": ".yeoshin.co.kr",
-                    "path": "/"
-                })
-                self.driver.add_cookie(cookie)
-
-            self.driver.refresh()
-            time.sleep(2)
             
-        except Exception as e:
-            logging.error(f"Driver 설정 중 오류 발생: {str(e)}")
-            raise
+        self.driver.set_page_load_timeout(30)  # 페이지 로드 타임아웃 설정
+        self.wait = WebDriverWait(self.driver, 15)  # 기본 대기 시간 감소
+
+        # 빈 페이지 접속
+        self.driver.get("https://www.yeoshin.co.kr")
+        time.sleep(2)
+
+        # 로그인 관련 쿠키 설정
+        cookies = [
+            {"name": "LOGIN_INFO", "value": os.getenv("LOGIN_INFO")},
+            {"name": "HSID", "value": os.getenv("HSID")},
+            {"name": "SSID", "value": os.getenv("SSID")},
+            {"name": "APISID", "value": os.getenv("APISID")},
+            {"name": "SAPISID", "value": os.getenv("SAPISID")},
+            {"name": "SID", "value": os.getenv("SID")},
+            {"name": "_kau", "value": os.getenv("KAU")},
+            {"name": "_kahai", "value": os.getenv("KAHAI")},
+            {"name": "_karmt", "value": os.getenv("KARMT")},
+            {"name": "_kawlt", "value": os.getenv("KAWLT")},
+            {"name": "access_token", "value": os.getenv("ACCESS_TOKEN")}
+        ]
+
+        for cookie in cookies:
+            cookie.update({
+                "domain": ".yeoshin.co.kr",
+                "path": "/"
+            })
+            self.driver.add_cookie(cookie)
+
+        self.driver.refresh()
+        time.sleep(2)
+
+    except Exception as e:
+        logging.error(f"Driver 설정 중 오류 발생: {str(e)}")
+        raise
 
     def wait_for_page_load(self, timeout=15):
         try:
