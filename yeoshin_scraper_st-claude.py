@@ -25,7 +25,20 @@ import io
 import re
 import os
 from dotenv import load_dotenv
+import subprocess
 
+# Streamlit Cloud에서 Chrome 설치
+def install_chrome():
+    try:
+        subprocess.run(['apt-get', 'update'])
+        subprocess.run(['apt-get', 'install', '-y', 'chromium-browser'])
+    except Exception as e:
+        st.error(f"Chrome 설치 중 오류 발생: {str(e)}")
+
+# 앱 시작 시 Chrome 설치
+if 'STREAMLIT_CLOUD' in os.environ:
+    install_chrome()
+    
 # 파일 상단에 환경 변수 로드
 load_dotenv()
 
