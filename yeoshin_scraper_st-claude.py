@@ -24,13 +24,15 @@ from reportlab.pdfbase.pdfmetrics import registerFontFamily
 import io
 import re
 import os
+if 'STREAMLIT_CLOUD' in os.environ:
+    install_chrome()
 from dotenv import load_dotenv
 import subprocess
 
 # Streamlit Cloud에서 Chrome 설치
 def install_chrome():
     try:
-        subprocess.run(['apt-get', 'update'])
+        subprocess.run(['apt-get', 'update'], check=True)
         subprocess.run(['apt-get', 'install', '-y', 'chromium-browser'])
     except Exception as e:
         st.error(f"Chrome 설치 중 오류 발생: {str(e)}")
@@ -58,6 +60,7 @@ class YeoshinScraper:
         try:
             options = webdriver.ChromeOptions()
             # 성능 최적화 옵션들
+            options.add_argument('--headless')            
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-extensions')  # 확장 프로그램 비활성화
@@ -71,7 +74,6 @@ class YeoshinScraper:
             options.add_argument('--disable-popup-blocking')
             options.add_argument('--blink-settings=imagesEnabled=false')  # 이미지 로딩 비활성화
             options.add_argument('--window-size=1920,1080')
-            options.add_argument('--headless')  # Streamlit 환경에서 필요
 
             # 메모리 관련 설정
             options.add_argument('--disable-dev-shm-usage')
