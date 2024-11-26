@@ -24,12 +24,9 @@ from reportlab.pdfbase.pdfmetrics import registerFontFamily
 import io
 import re
 import os
-if 'STREAMLIT_CLOUD' in os.environ:
-    install_chrome()
 from dotenv import load_dotenv
-import subprocess
 
-# Streamlit Cloud에서 Chrome 설치
+# Streamlit Cloud에서 Chrome 설치 함수
 def install_chrome():
     try:
         subprocess.run(['apt-get', 'update'], check=True)
@@ -37,12 +34,13 @@ def install_chrome():
     except Exception as e:
         st.error(f"Chrome 설치 중 오류 발생: {str(e)}")
 
-# 앱 시작 시 Chrome 설치
-if 'STREAMLIT_CLOUD' in os.environ:
-    install_chrome()
-    
-# 파일 상단에 환경 변수 로드
+# 환경 변수 로드
 load_dotenv()
+
+# Streamlit Cloud 환경에서 Chrome 설치
+if 'STREAMLIT_CLOUD' in os.environ:
+    import subprocess
+    install_chrome()
 
 class YeoshinScraper:
     def __init__(self):
@@ -63,16 +61,17 @@ class YeoshinScraper:
             options.add_argument('--headless')            
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-extensions')  # 확장 프로그램 비활성화
-            options.add_argument('--disable-notifications')  # 알림 비활성화
-            options.add_argument('--disable-logging')  # 로깅 비활성화
-            options.add_argument('--disable-default-apps')  # 기본 앱 비활성화
-            options.add_argument('--disable-infobars')  # 정보 표시줄 비활성화
-            options.add_argument('--disable-blink-features=AutomationControlled')  # 자동화 감지 방지
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-notifications')
+            options.add_argument('--disable-logging')
+            options.add_argument('--log-level=3')
+            options.add_argument('--disable-default-apps')
+            options.add_argument('--disable-infobars')
+            options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_argument('--start-maximized')  
             options.add_argument('--disable-gpu')
             options.add_argument('--disable-popup-blocking')
-            options.add_argument('--blink-settings=imagesEnabled=false')  # 이미지 로딩 비활성화
+            options.add_argument('--blink-settings=imagesEnabled=false')
             options.add_argument('--window-size=1920,1080')
 
             # 메모리 관련 설정
@@ -89,15 +88,14 @@ class YeoshinScraper:
                 options.add_argument('--no-sandbox')
                 options.add_argument('--disable-dev-shm-usage')
             
-            service = Service()
             if 'STREAMLIT_CLOUD' in os.environ:
                 self.driver = webdriver.Chrome(options=options)
             else:
                 service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=options)
                 
-            self.driver.set_page_load_timeout(30)  # 페이지 로드 타임아웃 설정
-            self.wait = WebDriverWait(self.driver, 15)  # 기본 대기 시간 감소
+            self.driver.set_page_load_timeout(30)
+            self.wait = WebDriverWait(self.driver, 15)
 
             # 빈 페이지 접속
             self.driver.get("https://www.yeoshin.co.kr")
@@ -119,6 +117,10 @@ class YeoshinScraper:
             ]
 
             for cookie in cookies:
+                if cookie["value"] is None:
+                    logging.warning(f"쿠키 값이 없습니다: {cookie['name']}")
+                    continue
+                    
                 cookie.update({
                     "domain": ".yeoshin.co.kr",
                     "path": "/"
@@ -176,6 +178,7 @@ class YeoshinScraper:
             logging.error(f"검색 중 오류 발생: {str(e)}")
 
     def get_event_details(self, item, progress_value, progress_bar):
+        main_window = self.driver.current_window_handle
         try:
             # 병원 이름과 지역 정보 추출
             spans = item.find_elements(By.CSS_SELECTOR, "span")
@@ -198,7 +201,6 @@ class YeoshinScraper:
                 time.sleep(3)
                 
                 # 새 창으로 전환
-                main_window = self.driver.current_window_handle
                 new_window = [handle for handle in self.driver.window_handles if handle != main_window][0]
                 self.driver.switch_to.window(new_window)
                 time.sleep(3)
@@ -208,53 +210,61 @@ class YeoshinScraper:
                 
                 # 평점, 리뷰수, 스크랩수, 문의수 추출
                 try:
-                    rating = self.driver.find_element(
+                    rating_element = self.driver.find_element(
                         By.XPATH,
                         '//*[@id="ct-view"]/div/div/div/div[2]/div[1]/article/section/div[2]/div/div/span'
-                    ).text.strip()
-                    # '후기' 텍스트 제거하고 숫자만 추출
-                    review_count = re.sub(r'[^0-9]', '', review_count)
-                except:
+                    )
+                    rating = rating_element.text.strip()
+                except NoSuchElementException:
                     rating = "N/A"
-                    
+                
                 try:
-                    review_count = self.driver.find_element(
+                    review_count_element = self.driver.find_element(
                         By.XPATH,
                         '//*[@id="ct-view"]/div/div/div/div[2]/div[1]/article/section/div[2]/div/span'
-                    ).text.strip()
-                except:
+                    )
+                    review_count = review_count_element.text.strip()
+                    # '후기' 텍스트 제거하고 숫자만 추출
+                    review_count = re.sub(r'[^0-9]', '', review_count)
+                except NoSuchElementException:
                     review_count = "N/A"
-                    
+                
                 try:
-                    scrap_count = self.driver.find_element(
+                    scrap_element = self.driver.find_element(
                         By.XPATH,
                         '//*[@id="ct-view"]/div/div/section/div[1]/div/p'
-                    ).text.strip()
-                except:
+                    )
+                    scrap_count = scrap_element.text.strip()
+                except NoSuchElementException:
                     scrap_count = "N/A"
-                    
+                
                 try:
-                    inquiry_count = self.driver.find_element(
+                    inquiry_element = self.driver.find_element(
                         By.XPATH,
                         '//*[@id="ct-view"]/div/div/div/div[2]/div[4]/div[1]/div/p[2]'
-                    ).text.strip()
-                except:
+                    )
+                    inquiry_count = inquiry_element.text.strip()
+                except NoSuchElementException:
                     inquiry_count = "N/A"
 
                 # 옵션 정보 수집
                 options_data = []
                 try:
                     # 전체보기 버튼 찾기 및 클릭
-                    view_all_button = self.driver.find_element(
-                        By.XPATH,
-                        '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[2]/div[position()>=2 and position()<=4]/div/div[2]/p'
+                    view_all_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((
+                            By.XPATH,
+                            '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[2]/div[position()>=2 and position()<=4]/div/div[2]/p'
+                        ))
                     )
                     self.driver.execute_script("arguments[0].click();", view_all_button)
                     time.sleep(2)
                     
                     # 모달에서 옵션 정보 수집
                     options_base_xpath = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
-                    options = self.driver.find_elements(By.XPATH, f"{options_base_xpath}/div")
+                    options = WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_all_elements_located((By.XPATH, f"{options_base_xpath}/div"))
+                    )
                     
                     for i in range(1, len(options) + 1):
                         try:
@@ -282,38 +292,46 @@ class YeoshinScraper:
                                     'detail_link': detail_link
                                 })
                         except Exception as e:
+                            logging.error(f"개별 옵션 정보 추출 중 오류: {str(e)}")
                             continue
                             
-                except Exception as e:
+                except TimeoutException:
+                    logging.info("전체보기 버튼을 찾을 수 없어 기본 옵션 정보를 수집합니다.")
                     # 기본 옵션 정보 수집
-                    options_container = self.driver.find_element(
-                        By.XPATH,
-                        '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[2]/div[1]/div[2]/div[1]'
-                    )
-                    option_elements = options_container.find_elements(By.XPATH, './div/div')
-                    
-                    for option in option_elements:
-                        try:
-                            divs = option.find_elements(By.CSS_SELECTOR, "div")
-                            if len(divs) >= 2:
-                                option_name = divs[0].text.strip()
-                                option_price = divs[1].text.strip()
-                                
-                                if option_name and option_price:
-                                    options_data.append({
-                                        'hospital_name': hospital_name,
-                                        'location': location,
-                                        'event_name': event_name,
-                                        'option_name': option_name,
-                                        'price': option_price,
-                                        'rating': rating,
-                                        'review_count': review_count,
-                                        'scrap_count': scrap_count,
-                                        'inquiry_count': inquiry_count,
-                                        'detail_link': detail_link
-                                    })
-                        except Exception as e:
-                            continue
+                    try:
+                        options_container = WebDriverWait(self.driver, 10).until(
+                            EC.presence_of_element_located((
+                                By.XPATH,
+                                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[2]/div[1]/div[2]/div[1]'
+                            ))
+                        )
+                        option_elements = options_container.find_elements(By.XPATH, './div/div')
+                        
+                        for option in option_elements:
+                            try:
+                                divs = option.find_elements(By.CSS_SELECTOR, "div")
+                                if len(divs) >= 2:
+                                    option_name = divs[0].text.strip()
+                                    option_price = divs[1].text.strip()
+                                    
+                                    if option_name and option_price:
+                                        options_data.append({
+                                            'hospital_name': hospital_name,
+                                            'location': location,
+                                            'event_name': event_name,
+                                            'option_name': option_name,
+                                            'price': option_price,
+                                            'rating': rating,
+                                            'review_count': review_count,
+                                            'scrap_count': scrap_count,
+                                            'inquiry_count': inquiry_count,
+                                            'detail_link': detail_link
+                                        })
+                            except Exception as e:
+                                logging.error(f"기본 옵션 정보 추출 중 오류: {str(e)}")
+                                continue
+                    except TimeoutException:
+                        logging.error("기본 옵션 컨테이너를 찾을 수 없습니다.")
 
                 # 창 닫고 원래 창으로 복귀
                 self.driver.close()
@@ -342,7 +360,7 @@ class YeoshinScraper:
             # 컨테이너 찾기 전에 한 번 더 스크롤
             self.scroll_to_load_all()
             
-            events_container = self.wait.until(
+            events_container = WebDriverWait(self.driver, 15).until(
                 EC.presence_of_element_located((
                     By.CSS_SELECTOR,
                     "#ct-view > div > main > article > section:nth-child(2) > section"
@@ -386,13 +404,10 @@ def create_visualizations(df):
     # 가격 데이터 정제
     df_viz = df.copy()
     df_viz['price_cleaned'] = df_viz['가격'].apply(clean_price)
-    
-    # Null이 아닌 데이터만 사용
     df_viz = df_viz[df_viz['price_cleaned'].notna()]
     
     # 각 병원별로 첫 번째 옵션만 선택
     df_first_options = df_viz.groupby(['병원명', '위치']).first().reset_index()
-
     
     # 지역별 평균 가격 계산 (첫 번째 옵션만 사용)
     fig_price = px.bar(
@@ -422,67 +437,45 @@ def validate_data(df):
     return True
 
 def analyze_with_claude(df):
-    anthropic = Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
-    
-    # 데이터 전처리
-    analysis_data = df.copy()
-    analysis_data['exposure_order'] = analysis_data.index + 1
-    
-    prompt = f"""
-    여신티켓의 시술 이벤트 데이터를 분석하여, 새로운 이벤트를 등록하려는 병원에게 도움이 될 만한 인사이트를 제공해주세요.
-    
-    아래 형식에 맞춰 분석해주세요:
-    
-    A. 옵션 분석
-    1. 옵션명 패턴 분석:
-    - 가장 많이 사용되는 옵션명 패턴
-    - 효과적인 옵션명 구성 방식
-    
-    2. 가격대별 옵션 구성 특징:
-    - 가격대별 옵션 구성의 특징
-    - 가격대별 할인율 패턴
-    
-    3. 평균 옵션 개수 분석:
-    - 이벤트당 평균 옵션 수
-    - 최적의 옵션 구성 제안
-    
-    B. 첫 번째 옵션 분석
-    1. 일반적인 첫 번째 옵션 패턴:
-    - 주로 사용되는 첫 번째 옵션의 구성과 특징
-    - 첫 번째 옵션의 가격대별 분포
-    
-    2. 가격 비교:
-    - 가장 저렴한 첫 번째 옵션: 병원명, 위치, 옵션명, 가격
-    - 가장 비싼 첫 번째 옵션: 병원명, 위치, 옵션명, 가격
-    
-    C. 위치 기반 분석
-    1. 지역별 특성:
-    - 지역별 평균 가격대
-    - 지역별 옵션 구성 특징
-    - 지역별 고객 반응(리뷰/평점) 특징
-    
-    D. 고객 반응 분석
-    1. 고객 반응 상세 분석:
-    - 문의수가 많은 이벤트들의 특징
-    - 평점과 리뷰 수의 상관관계
-    - 스크랩 수가 높은 이벤트의 특징
-    - 고객 관심을 이끌어내는 핵심 요소들
-    
-    분석 시 다음 가이드라인을 준수해주세요:
-    1. 실제 예시와 수치를 근거로 들어 분석해주세요.
-    2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
-    3. 분석할 때 주의사항:
-        - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
-        예시:  - '30만원~100만원' 대신 '30만원부터 100만원까지' 또는 '30만원-100만원' 사용
-               - '5cc~10cc' 대신 '5cc부터 10cc까지' 또는 '5cc-10cc' 사용
-    
-    마지막으로, 위 분석을 바탕으로 새로운 이벤트를 등록하려는 병원에게 3가지 핵심 제언을 해주세요.
-    
-    분석할 데이터:
-    {analysis_data.to_string()}
-    """
-    
     try:
+        anthropic = Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
+        
+        # 데이터 전처리
+        analysis_data = df.copy()
+        analysis_data['exposure_order'] = analysis_data.index + 1
+        
+        prompt = f"""
+        여신티켓의 시술 이벤트 데이터를 분석하여, 새로운 이벤트를 등록하려는 병원에게 도움이 될 만한 인사이트를 제공해주세요.
+        
+        아래 형식에 맞춰 분석해주세요:
+        
+        A. 옵션 분석
+        1. 옵션명 패턴 분석
+        2. 가격대별 옵션 구성 특징
+        3. 평균 옵션 개수 분석
+        
+        B. 첫 번째 옵션 분석
+        1. 일반적인 첫 번째 옵션 패턴
+        2. 가격 비교
+        
+        C. 위치 기반 분석
+        1. 지역별 특성
+        
+        D. 고객 반응 분석
+        1. 고객 반응 상세 분석
+        
+        분석 시 다음 가이드라인을 준수해주세요:
+        1. 실제 예시와 수치를 근거로 들어 분석해주세요.
+        2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
+        3. 분석할 때 주의사항:
+            - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
+        
+        마지막으로, 3가지 핵심 제언을 해주세요.
+        
+        데이터:
+        {analysis_data.to_string()}
+        """
+        
         response = anthropic.messages.create(
             model="claude-3-sonnet-20240229",
             max_tokens=2000,
@@ -495,29 +488,23 @@ def analyze_with_claude(df):
             
             st.header("🔍 AI 분석 결과")
             
-            # A. 옵션 분석
-            st.subheader("A. 옵션 분석 📊")
-            options_section = content[content.find("A. 옵션 분석"):content.find("B. 첫 번째 옵션")]
-            for i in range(1, 4):
-                st.markdown(f"**{i}. {options_section.split(f'{i}.')[1].split(f'{i+1}.')[0].strip()}**")
+            sections = {
+                "A": "옵션 분석 📊",
+                "B": "첫 번째 옵션 분석 💰",
+                "C": "위치 기반 분석 📍",
+                "D": "고객 반응 분석 👥"
+            }
+            
+            for section, title in sections.items():
+                st.subheader(f"{title}")
+                section_start = content.find(f"{section}.")
+                section_end = content.find(f"{chr(ord(section)+1)}.") if section != "D" else content.find("마지막으로")
                 
-            # B. 첫 번째 옵션 분석
-            st.subheader("B. 첫 번째 옵션 분석 💰")
-            first_option_section = content[content.find("B. 첫 번째 옵션"):content.find("C. 위치 기반")]
-            for i in range(1, 3):
-                st.markdown(f"**{i}. {first_option_section.split(f'{i}.')[1].split(f'{i+1}.')[0].strip()}**")
+                if section_start != -1:
+                    section_content = content[section_start:section_end].strip()
+                    st.markdown(section_content)
             
-            # C. 위치 기반 분석
-            st.subheader("C. 위치 기반 분석 📍")
-            location_section = content[content.find("C. 위치 기반"):content.find("D. 고객 반응")]
-            st.markdown(location_section)
-            
-            # D. 고객 반응 분석
-            st.subheader("D. 고객 반응 분석 👥")
-            customer_section = content[content.find("D. 고객 반응"):content.find("마지막으로")]
-            st.markdown(customer_section)
-            
-            # 핵심 제언
+            # 핵심 제언 표시
             if "핵심 제언" in content:
                 st.subheader("💡 새로운 이벤트 등록을 위한 핵심 제언")
                 recommendations = content[content.find("핵심 제언"):].split("\n")
@@ -535,13 +522,13 @@ def analyze_with_claude(df):
         st.error(f"Claude AI 분석 중 오류가 발생했습니다: {str(e)}")
         return "분석을 수행할 수 없습니다."
 
-def generate_pdf(df, analysis_text, fig_price, fig_dist):
+def generate_pdf(df, analysis_text):
     try:
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4)
         
         # 나눔고딕 폰트 경로 지정 및 등록
-        FONT_PATH = r"D:\code\yeoshin/NanumGothic.ttf"
+        FONT_PATH = os.path.join(os.path.dirname(__file__), "NanumGothic.ttf")
         try:
             pdfmetrics.registerFont(TTFont('NanumGothic', FONT_PATH))
             registerFontFamily('NanumGothic', normal='NanumGothic')
@@ -566,7 +553,6 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
             spaceAfter=30
         ))
         
-        # PDF에 들어갈 요소들을 담을 리스트
         elements = []
         
         # 제목 추가
@@ -586,7 +572,6 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
             'inquiry_count': '문의수'
         }
         
-        # 테이블 데이터 준비
         table_data = [[col_names[col] for col in col_names.keys()]]
         
         for _, row in df.iterrows():
@@ -599,7 +584,6 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
                     table_row.append('N/A')
             table_data.append(table_row)
         
-        # 테이블 스타일 설정
         table_style = TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -616,27 +600,11 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ])
         
-# 테이블 생성 및 스타일 적용
         table = Table(table_data, repeatRows=1)
         table.setStyle(table_style)
         elements.append(table)
         
-        try:
-            # 시각화 섹션 제목
-            elements.append(Spacer(1, 30))
-            elements.append(Paragraph('데이터 시각화', styles['KoreanHeading1']))
-            
-            # 그래프 이미지 저장 및 추가
-            fig_price.write_image("price_plot.png")
-            fig_dist.write_image("dist_plot.png")
-            
-            elements.append(Image("price_plot.png", width=500, height=300))
-            elements.append(Spacer(1, 30))
-            elements.append(Image("dist_plot.png", width=500, height=300))
-        except Exception as e:
-            elements.append(Paragraph(f'그래프 생성 중 오류 발생: {str(e)}', styles['KoreanNormal']))
-        
-        # 분석 리포트 섹션
+        # 분석 리포트
         elements.append(Spacer(1, 30))
         elements.append(Paragraph('분석 리포트', styles['KoreanHeading1']))
         elements.append(Paragraph(analysis_text, styles['KoreanNormal']))
@@ -694,7 +662,7 @@ def main():
                 analysis_text = analyze_with_claude(df)
                       
             try:
-                pdf_bytes = generate_pdf(df, analysis_text, fig_price, None)
+                pdf_bytes = generate_pdf(df, analysis_text)
                 if pdf_bytes:
                     st.download_button(
                         label="PDF 보고서 다운로드",
