@@ -25,22 +25,41 @@ import io
 import re
 import os
 from dotenv import load_dotenv
+import platform
+import subprocess
+import sys
+
+def is_streamlit_cloud():
+    """Streamlit Cloud 환경인지 확인하는 함수"""
+    return 'STREAMLIT_CLOUD' in os.environ
 
 # Streamlit Cloud에서 Chrome 설치 함수
 def install_chrome():
-    try:
-        subprocess.run(['apt-get', 'update'], check=True)
-        subprocess.run(['apt-get', 'install', '-y', 'chromium-browser'])
-    except Exception as e:
-        st.error(f"Chrome 설치 중 오류 발생: {str(e)}")
+    """Install Chromium for Streamlit Cloud"""
+    if is_streamlit_cloud():  # Streamlit Cloud 환경 체크
+        try:
+            # 성공적인 설치 확인을 위한 과정 추가
+            subprocess.run(['apt-get', 'update'], check=True)
+            subprocess.run(['apt-get', 'install', '-y', 'chromium-browser', 'chromium-chromedriver'], check=True)
+            
+            # 설치 확인
+            result = subprocess.run(['chromium-browser', '--version'], 
+                                  capture_output=True, 
+                                  text=True)
+            if result.returncode == 0:
+                st.success(f"Chromium 설치 완료: {result.stdout.strip()}")
+                return True
+            else:
+                st.error("Chromium 설치 확인 실패")
+                return False
+                
+        except Exception as e:
+            st.error(f"Chromium 설치 중 오류 발생: {str(e)}")
+            return False
+    return False
 
 # 환경 변수 로드
 load_dotenv()
-
-# Streamlit Cloud 환경에서 Chrome 설치
-if 'STREAMLIT_CLOUD' in os.environ:
-    import subprocess
-    install_chrome()
 
 class YeoshinScraper:
     def __init__(self):
@@ -51,57 +70,85 @@ class YeoshinScraper:
     def setup_logging(self):
         logging.basicConfig(
             level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
+            format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler('scraper.log')
+            ]
         )
-        
+
+    # 쿠키 유효성 검증 함수 추가
+    def validate_cookie(self, cookie):
+        return (
+            cookie.get("name") and 
+            cookie.get("value") and 
+            not cookie["value"].startswith("os.getenv")
+        )    
+    
     def setup_driver(self):
         try:
             options = webdriver.ChromeOptions()
-            # 성능 최적화 옵션들
-            options.add_argument('--headless')            
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-extensions')
-            options.add_argument('--disable-notifications')
-            options.add_argument('--disable-logging')
-            options.add_argument('--log-level=3')
-            options.add_argument('--disable-default-apps')
-            options.add_argument('--disable-infobars')
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_argument('--start-maximized')  
-            options.add_argument('--disable-gpu')
-            options.add_argument('--disable-popup-blocking')
-            options.add_argument('--blink-settings=imagesEnabled=false')
-            options.add_argument('--window-size=1920,1080')
-
-            # 메모리 관련 설정
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--no-zygote')
-            options.add_argument('--disable-accelerated-2d-canvas')
-            options.add_argument('--disable-webgl')
-
-            options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
             
-            # Streamlit Cloud 환경일 때의 추가 설정
-            if 'STREAMLIT_CLOUD' in os.environ:
+            # 기본 공통 옵션 설정
+            common_options = [
+                '--headless',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-notifications',
+                '--disable-logging',
+                '--log-level=3',
+                '--disable-default-apps',
+                '--disable-infobars',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-popup-blocking',
+                '--blink-settings=imagesEnabled=false',
+                '--window-size=1920,1080'
+            ]
+            
+            # Streamlit Cloud 환경 전용 옵션
+            if is_streamlit_cloud():
                 options.binary_location = '/usr/bin/chromium-browser'
                 options.add_argument('--no-sandbox')
                 options.add_argument('--disable-dev-shm-usage')
-            
-            if 'STREAMLIT_CLOUD' in os.environ:
-                self.driver = webdriver.Chrome(options=options)
-            else:
-                service = Service(ChromeDriverManager().install())
-                self.driver = webdriver.Chrome(service=service, options=options)
+                # 메모리 최적화 옵션
+                options.add_argument('--no-zygote')
+                options.add_argument('--disable-accelerated-2d-canvas')
+                options.add_argument('--disable-webgl')
                 
+            # 공통 옵션 적용
+            for option in common_options:
+                options.add_argument(option)
+    
+            # User-Agent 설정
+            options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            
+            # 환경에 따른 웹드라이버 초기화
+            try:
+                if is_streamlit_cloud():
+                    self.driver = webdriver.Chrome(options=options)
+                else:
+                    service = Service(ChromeDriverManager().install())
+                    self.driver = webdriver.Chrome(service=service, options=options)
+            except Exception as e:
+                logging.error(f"Chrome 드라이버 초기화 실패: {str(e)}")
+                if is_streamlit_cloud():
+                    # ChromeDriver 경로 확인
+                    subprocess.run(['which', 'chromedriver'])
+                raise
+                    
+            # 타임아웃 및 대기 설정
             self.driver.set_page_load_timeout(30)
             self.wait = WebDriverWait(self.driver, 15)
-
-            # 빈 페이지 접속
-            self.driver.get("https://www.yeoshin.co.kr")
-            time.sleep(2)
-
-            # 로그인 관련 쿠키 설정
+    
+            # 초기 페이지 접속
+            try:
+                self.driver.get("https://www.yeoshin.co.kr")
+                self.wait_for_page_load()
+            except Exception as e:
+                logging.error(f"초기 페이지 접속 실패: {str(e)}")
+                raise
+    
+            # 쿠키 설정
             cookies = [
                 {"name": "LOGIN_INFO", "value": os.getenv("LOGIN_INFO")},
                 {"name": "HSID", "value": os.getenv("HSID")},
@@ -115,23 +162,40 @@ class YeoshinScraper:
                 {"name": "_kawlt", "value": os.getenv("KAWLT")},
                 {"name": "access_token", "value": os.getenv("ACCESS_TOKEN")}
             ]
-
+    
+            cookie_count = 0
             for cookie in cookies:
-                if cookie["value"] is None:
-                    logging.warning(f"쿠키 값이 없습니다: {cookie['name']}")
+                if not self.validate_cookie(cookie):
+                    logging.warning(f"유효하지 않은 쿠키: {cookie['name']}")
                     continue
                     
                 cookie.update({
                     "domain": ".yeoshin.co.kr",
                     "path": "/"
                 })
-                self.driver.add_cookie(cookie)
-
-            self.driver.refresh()
-            time.sleep(2)
-
+                try:
+                    self.driver.add_cookie(cookie)
+                    cookie_count += 1
+                except Exception as e:
+                    logging.error(f"쿠키 설정 실패 {cookie['name']}: {str(e)}")
+    
+            if cookie_count == 0:
+                logging.warning("설정된 쿠키가 없습니다.")
+                st.warning("로그인 쿠키가 설정되지 않았습니다. 데이터 수집이 제한될 수 있습니다.")
+    
+            # 페이지 새로고침
+            try:
+                self.driver.refresh()
+                self.wait_for_page_load()
+            except Exception as e:
+                logging.error(f"페이지 새로고침 실패: {str(e)}")
+                raise
+    
         except Exception as e:
             logging.error(f"Driver 설정 중 오류 발생: {str(e)}")
+            st.error(f"웹 드라이버 설정 실패: {str(e)}")
+            if self.driver:
+                self.driver.quit()
             raise
 
     def wait_for_page_load(self, timeout=15):
@@ -351,6 +415,10 @@ class YeoshinScraper:
 
     def scrape_data(self, keyword, progress_bar):
         try:
+            if not keyword:
+                st.warning("검색어를 입력해주세요.")
+                return pd.DataFrame()
+                
             self.setup_driver()
             self.search_keyword(keyword, progress_bar)
             
