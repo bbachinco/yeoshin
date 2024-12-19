@@ -117,21 +117,14 @@ class YeoshinScraper:
             options = webdriver.ChromeOptions()
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--start-maximized')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--disable-popup-blocking')
-            options.add_argument('--disable-extensions')
-            options.add_argument('--disable-software-rasterizer')
-            options.add_argument('--ignore-certificate-errors')
-            options.add_argument('--log-level=3')
-            options.add_argument('--window-size=1920,1080')
             options.add_argument('--headless=new')
-            options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
+            options.add_argument('--disable-gpu')
             
-            # Chromium 사용
-            options.binary_location = '/usr/bin/chromium'
+            # Streamlit Cloud 환경에서 필요한 추가 옵션
+            options.binary_location = "/usr/bin/chromium-browser"
             
-            service = Service('/usr/bin/chromedriver')
+            service = Service(executable_path="/usr/lib/chromium-browser/chromedriver")
+            
             self.driver = webdriver.Chrome(service=service, options=options)
             self.wait = WebDriverWait(self.driver, 20)
             self.logger.info("Chrome 드라이버 설정 완료")
@@ -259,7 +252,7 @@ class YeoshinScraper:
                     self.logger.info(f"이벤트명 추출 성공: {event_data['event_name']}")
                     break
                 except Exception as e:
-                    self.logger.debug(f"이벤트명 선��자 {selector} 실패: {str(e)}")
+                    self.logger.debug(f"이벤트명 선택자 {selector} 실패: {str(e)}")
             
             # 평점 추출
             self.logger.info("평점 추출 시도...")
@@ -409,7 +402,7 @@ class YeoshinScraper:
 
                 # 버튼 클릭 시도
                 purchase_button_clicked = False
-                if len(buttons) == 1:  # 버튼이 하나만 있는 경우
+                if len(buttons) == 1:  # 버튼��� 하나만 있는 경우
                     try:
                         self.driver.execute_script("arguments[0].click();", buttons[0])
                         self.logger.info("단일 구매하기 버튼 클릭 성공")
@@ -431,7 +424,7 @@ class YeoshinScraper:
 
                 time.sleep(2)  # 모달창이 열리기를 기다림
 
-                # 옵션 리스트 컨테이��� 찾기
+                # 옵션 리스트 컨테이너 찾기
                 options_container_selector = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
                 options_container = WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, options_container_selector))
@@ -523,7 +516,7 @@ class YeoshinScraper:
                     continue
                 
             if not container:
-                raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
+                raise Exception("검색 결과 리스트 컨테이너를 찾을 수 ��습니다")
             
             # 컨테이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
             events = []
@@ -553,7 +546,7 @@ class YeoshinScraper:
             # 각 이벤트마다 상세 정보 수집
             for idx in range(1, total_items + 1):
                 try:
-                    self.logger.info(f"\n=== {idx}번��� 이벤트 수집 시작 ({idx}/{total_items}) ===")
+                    self.logger.info(f"\n=== {idx}번째 이벤트 수집 시작 ({idx}/{total_items}) ===")
                     progress_value = 0.3 + (0.7 * (idx / total_items))
                     
                     # 현재 URL 저장
@@ -673,7 +666,7 @@ def analyze_with_claude(df):
         3. 평균 옵션 개수 분석
         
         B. 첫 번째 옵션 분석
-        1. 일반적인 첫 번째 옵션 패턴
+        1. 일반���인 첫 번째 옵션 패턴
         2. 가격 비교
         
         C. 위치 기반 분석
@@ -708,7 +701,7 @@ def analyze_with_claude(df):
             
             sections = {
                 "A": "옵션 분석 📊",
-                "B": "첫 번째 옵션 분석 💰",
+                "B": "첫 번째 옵션 분��� 💰",
                 "C": "위치 기반 분석 📍",
                 "D": "고객 반응 분석 👥"
             }
@@ -737,7 +730,7 @@ def analyze_with_claude(df):
             return "분석 결과를 표시할 수 없습니다."
             
     except Exception as e:
-        st.error(f"Claude AI 분석 중 오류가 발생했습니다: {str(e)}")
+        st.error(f"Claude AI 분석 중 오류�� 발생했습니다: {str(e)}")
         return "분석을 행할 수 없습니다."
 
 
