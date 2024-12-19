@@ -113,6 +113,12 @@ class YeoshinScraper:
     def setup_driver(self):
         """드라이버 설정"""
         try:
+            # Chrome 설치 (스트림릿 클라우드용)
+            os.system('wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -')
+            os.system('echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list')
+            os.system('apt-get update')
+            os.system('apt-get install -y google-chrome-stable')
+            
             options = webdriver.ChromeOptions()
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
@@ -128,8 +134,9 @@ class YeoshinScraper:
             options.add_argument('--headless=new')
             options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
             
+            # 스트림릿 클라우드 환경에서는 ChromeDriverManager 대신 직접 경로 지정
             service = Service(
-                ChromeDriverManager().install(),
+                '/usr/bin/chromedriver',  # 스트림릿 클라우드의 ChromeDriver 경로
                 log_output=os.devnull
             )
             
@@ -229,7 +236,7 @@ class YeoshinScraper:
             'location': "위치 정보 없음",
             'event_name': "이벤트 정보 없음",
             'option_name': "옵션 정보 없음",
-            'price': "가격 정보 없음",
+            'price': "가��� 정보 없음",
             'rating': "N/A",
             'review_count': "N/A",
             'scrap_count': "N/A",
@@ -689,7 +696,7 @@ def analyze_with_claude(df):
         3. 분석할 때 주의사항:
             - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
         
-        마지막으로, 3��지 핵심 제언 해주세요.
+        마지막으로, 3지 핵심 제언 해주세요.
         
         데이터:
         {analysis_data.to_string()}
@@ -723,7 +730,7 @@ def analyze_with_claude(df):
                     section_content = content[section_start:section_end].strip()
                     st.markdown(section_content)
             
-            # 핵심 제언 표시
+            # 핵심 제언 ���시
             if "핵 제언" in content:
                 st.subheader("💡 새로운 이벤트 등록을 위한 핵심 제언")
                 recommendations = content[content.find("핵심 제언"):].split("\n")
@@ -874,7 +881,7 @@ def main():
         if not df.empty and validate_data(df):
             st.success("데이터 수집이 완료되었습니다!")
             
-            # 검증 후 컬명을 한글로 ��경
+            # 검증 후 컬명을 한글로 경
             column_names = {
                 'hospital_name': '병원명',
                 'location': '위치',
