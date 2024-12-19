@@ -114,10 +114,12 @@ class YeoshinScraper:
         """드라이버 설정"""
         try:
             # Chrome 설치 (스트림릿 클라우드용)
-            os.system('wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -')
-            os.system('echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list')
-            os.system('apt-get update')
-            os.system('apt-get install -y google-chrome-stable')
+            os.system('sudo apt-get update')
+            os.system('sudo apt-get install -y wget')
+            os.system('sudo wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -')
+            os.system('sudo sh -c \'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list\'')
+            os.system('sudo apt-get update')
+            os.system('sudo apt-get install -y google-chrome-stable')
             
             options = webdriver.ChromeOptions()
             options.add_argument('--no-sandbox')
@@ -134,11 +136,12 @@ class YeoshinScraper:
             options.add_argument('--headless=new')
             options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
             
-            # 스트림릿 클라우드 환경에서는 ChromeDriverManager 대신 직접 경로 지정
-            service = Service(
-                '/usr/bin/chromedriver',  # 스트림릿 클라우드의 ChromeDriver 경로
-                log_output=os.devnull
-            )
+            # ChromeDriver 설치 및 경로 설정
+            from webdriver_manager.chrome import ChromeDriverManager
+            from webdriver_manager.core.os_manager import ChromeType
+            
+            chrome_path = ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install()
+            service = Service(chrome_path)
             
             self.driver = webdriver.Chrome(service=service, options=options)
             self.wait = WebDriverWait(self.driver, 20)
@@ -236,7 +239,7 @@ class YeoshinScraper:
             'location': "위치 정보 없음",
             'event_name': "이벤트 정보 없음",
             'option_name': "옵션 정보 없음",
-            'price': "가��� 정보 없음",
+            'price': "가격 정보 없음",
             'rating': "N/A",
             'review_count': "N/A",
             'scrap_count': "N/A",
@@ -525,7 +528,7 @@ class YeoshinScraper:
                         )
                     )
                     if container:
-                        self.logger.info("검색 결과 리스트 컨테이너 찾기 성공")
+                        self.logger.info("검색 결과 리스트 컨테���너 찾기 성공")
                         break
                 except:
                     continue
@@ -533,7 +536,7 @@ class YeoshinScraper:
             if not container:
                 raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
             
-            # 컨테이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
+            # 컨테이너 내의 ���든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
             events = []
             idx = 1
             while True:
@@ -561,7 +564,7 @@ class YeoshinScraper:
             # 각 이벤트마다 상세 정보 수집
             for idx in range(1, total_items + 1):
                 try:
-                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{total_items}) ===")
+                    self.logger.info(f"\n=== {idx}번째 이벤트 ��리 시작 ({idx}/{total_items}) ===")
                     progress_value = 0.3 + (0.7 * (idx / total_items))
                     
                     # 현재 URL 저장
@@ -690,7 +693,7 @@ def analyze_with_claude(df):
         D. 고객 반응 분석
         1. 고객 반응 상세 분석
         
-        분석 시 다음 가이드라인을 준수해주세요:
+        분�� 시 다음 가이드라인을 준수해주세요:
         1. 실제 예시와 수치를 근로 들어 분석해주세요.
         2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
         3. 분석할 때 주의사항:
@@ -730,7 +733,7 @@ def analyze_with_claude(df):
                     section_content = content[section_start:section_end].strip()
                     st.markdown(section_content)
             
-            # 핵심 제언 ���시
+            # 핵심 제언 시
             if "핵 제언" in content:
                 st.subheader("💡 새로운 이벤트 등록을 위한 핵심 제언")
                 recommendations = content[content.find("핵심 제언"):].split("\n")
@@ -900,7 +903,7 @@ def main():
             st.write("수집된 데이터:")
             st.dataframe(df, height=400)
             
-            # 시각화
+            # ���각화
             fig_price = create_visualizations(df)
             st.plotly_chart(fig_price)
             
