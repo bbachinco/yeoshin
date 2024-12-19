@@ -7,6 +7,7 @@ import io
 import re
 from dotenv import load_dotenv
 import tempfile
+import subprocess
 
 # Anthropic 관련
 from anthropic import Anthropic
@@ -114,12 +115,11 @@ class YeoshinScraper:
         """드라이버 설정"""
         try:
             # Chrome 설치 (스트림릿 클라우드용)
-            os.system('sudo apt-get update')
-            os.system('sudo apt-get install -y wget')
-            os.system('sudo wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -')
-            os.system('sudo sh -c \'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list\'')
-            os.system('sudo apt-get update')
-            os.system('sudo apt-get install -y google-chrome-stable')
+            os.system('apt-get update')
+            os.system('apt-get install -y wget')
+            os.system('wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb')
+            os.system('dpkg -i google-chrome-stable_current_amd64.deb')
+            os.system('apt-get install -f')  # 의존성 문제 해결
             
             options = webdriver.ChromeOptions()
             options.add_argument('--no-sandbox')
@@ -131,18 +131,15 @@ class YeoshinScraper:
             options.add_argument('--disable-software-rasterizer')
             options.add_argument('--ignore-certificate-errors')
             options.add_argument('--log-level=3')
-            
             options.add_argument('--window-size=1920,1080')
             options.add_argument('--headless=new')
             options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
             
-            # ChromeDriver 설치 및 경로 설정
+            # ChromeDriver 설정
+            from selenium.webdriver.chrome.service import Service as ChromeService
             from webdriver_manager.chrome import ChromeDriverManager
-            from webdriver_manager.core.os_manager import ChromeType
             
-            chrome_path = ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install()
-            service = Service(chrome_path)
-            
+            service = ChromeService(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=options)
             self.wait = WebDriverWait(self.driver, 20)
             self.logger.info("Chrome 드라이버 설정 완료")
@@ -528,7 +525,7 @@ class YeoshinScraper:
                         )
                     )
                     if container:
-                        self.logger.info("검색 결과 리스트 컨테���너 찾기 성공")
+                        self.logger.info("검색 결과 리스트 컨테이너 찾기 성공")
                         break
                 except:
                     continue
@@ -536,7 +533,7 @@ class YeoshinScraper:
             if not container:
                 raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
             
-            # 컨테이너 내의 ���든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
+            # 컨테이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
             events = []
             idx = 1
             while True:
@@ -564,7 +561,7 @@ class YeoshinScraper:
             # 각 이벤트마다 상세 정보 수집
             for idx in range(1, total_items + 1):
                 try:
-                    self.logger.info(f"\n=== {idx}번째 이벤트 ��리 시작 ({idx}/{total_items}) ===")
+                    self.logger.info(f"\n=== {idx}번째 이벤트 수집 시작 ({idx}/{total_items}) ===")
                     progress_value = 0.3 + (0.7 * (idx / total_items))
                     
                     # 현재 URL 저장
@@ -693,7 +690,7 @@ def analyze_with_claude(df):
         D. 고객 반응 분석
         1. 고객 반응 상세 분석
         
-        분�� 시 다음 가이드라인을 준수해주세요:
+        분석 시 다음 가이드라인을 준수해주세요:
         1. 실제 예시와 수치를 근로 들어 분석해주세요.
         2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
         3. 분석할 때 주의사항:
@@ -790,7 +787,7 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         elements.append(Paragraph('스크래핑 데이터', styles['KoreanHeading1']))
         elements.append(Spacer(1, 20))
         
-        # 데이터 테이블 생성
+        # 데이터 테이블 ��성
         col_names = {
             'hospital_name': '병원명',
             'location': '치',
@@ -868,7 +865,19 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
         return None
 
+def setup_chrome():
+    try:
+        subprocess.run(['apt-get', 'update'], check=True)
+        subprocess.run(['apt-get', 'install', '-y', 'wget'], check=True)
+        subprocess.run(['wget', 'https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb'], check=True)
+        subprocess.run(['dpkg', '-i', 'google-chrome-stable_current_amd64.deb'], check=True)
+        subprocess.run(['apt-get', 'install', '-f', '-y'], check=True)
+        print("Chrome 설치 완료")
+    except subprocess.CalledProcessError as e:
+        print(f"Chrome 설치 중 오류 발생: {e}")
+
 def main():
+    setup_chrome()
     st.title("여신티켓 데이터 스크래퍼")
     
     keyword = st.text_input("검색할 키워드를 입력하세요:")
@@ -903,7 +912,7 @@ def main():
             st.write("수집된 데이터:")
             st.dataframe(df, height=400)
             
-            # ���각화
+            # 시각화
             fig_price = create_visualizations(df)
             st.plotly_chart(fig_price)
             
