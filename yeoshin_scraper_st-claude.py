@@ -114,13 +114,6 @@ class YeoshinScraper:
     def setup_driver(self):
         """드라이버 설정"""
         try:
-            # Chrome 설치 (스트림릿 클라우드용)
-            os.system('apt-get update')
-            os.system('apt-get install -y wget')
-            os.system('wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb')
-            os.system('dpkg -i google-chrome-stable_current_amd64.deb')
-            os.system('apt-get install -f')  # 의존성 문제 해결
-            
             options = webdriver.ChromeOptions()
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
@@ -135,11 +128,10 @@ class YeoshinScraper:
             options.add_argument('--headless=new')
             options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
             
-            # ChromeDriver 설정
-            from selenium.webdriver.chrome.service import Service as ChromeService
-            from webdriver_manager.chrome import ChromeDriverManager
+            # Chromium 사용
+            options.binary_location = '/usr/bin/chromium'
             
-            service = ChromeService(ChromeDriverManager().install())
+            service = Service('/usr/bin/chromedriver')
             self.driver = webdriver.Chrome(service=service, options=options)
             self.wait = WebDriverWait(self.driver, 20)
             self.logger.info("Chrome 드라이버 설정 완료")
@@ -267,7 +259,7 @@ class YeoshinScraper:
                     self.logger.info(f"이벤트명 추출 성공: {event_data['event_name']}")
                     break
                 except Exception as e:
-                    self.logger.debug(f"이벤트명 선택자 {selector} 실패: {str(e)}")
+                    self.logger.debug(f"이벤트명 선��자 {selector} 실패: {str(e)}")
             
             # 평점 추출
             self.logger.info("평점 추출 시도...")
@@ -439,7 +431,7 @@ class YeoshinScraper:
 
                 time.sleep(2)  # 모달창이 열리기를 기다림
 
-                # 옵션 리스트 컨테이너 찾기
+                # 옵션 리스트 컨테이��� 찾기
                 options_container_selector = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
                 options_container = WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, options_container_selector))
@@ -561,7 +553,7 @@ class YeoshinScraper:
             # 각 이벤트마다 상세 정보 수집
             for idx in range(1, total_items + 1):
                 try:
-                    self.logger.info(f"\n=== {idx}번째 이벤트 수집 시작 ({idx}/{total_items}) ===")
+                    self.logger.info(f"\n=== {idx}번��� 이벤트 수집 시작 ({idx}/{total_items}) ===")
                     progress_value = 0.3 + (0.7 * (idx / total_items))
                     
                     # 현재 URL 저장
@@ -787,7 +779,7 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         elements.append(Paragraph('스크래핑 데이터', styles['KoreanHeading1']))
         elements.append(Spacer(1, 20))
         
-        # 데이터 테이블 ��성
+        # 데이터 테이블 성
         col_names = {
             'hospital_name': '병원명',
             'location': '치',
@@ -865,19 +857,7 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def setup_chrome():
-    try:
-        subprocess.run(['apt-get', 'update'], check=True)
-        subprocess.run(['apt-get', 'install', '-y', 'wget'], check=True)
-        subprocess.run(['wget', 'https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb'], check=True)
-        subprocess.run(['dpkg', '-i', 'google-chrome-stable_current_amd64.deb'], check=True)
-        subprocess.run(['apt-get', 'install', '-f', '-y'], check=True)
-        print("Chrome 설치 완료")
-    except subprocess.CalledProcessError as e:
-        print(f"Chrome 설치 중 오류 발생: {e}")
-
 def main():
-    setup_chrome()
     st.title("여신티켓 데이터 스크래퍼")
     
     keyword = st.text_input("검색할 키워드를 입력하세요:")
