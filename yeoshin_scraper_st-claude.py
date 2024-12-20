@@ -215,228 +215,124 @@ class YeoshinScraper:
             raise e
 
     def get_event_details(self, item, progress_value, progress_bar):
-        event_data = {
-            'hospital_name': "정보 없음",
-            'location': "위치 정보 없음",
-            'event_name': "이벤트 정보 없음",
-            'option_name': "옵션 정보 없음",
-            'price': "가격 정보 없음",
-            'rating': "N/A",
-            'review_count': "N/A",
-            'scrap_count': "N/A",
-            'inquiry_count': "N/A",
-            'detail_link': "N/A"
-        }
-        
+        """이벤트 상세 정보 추출"""
+        event_data = []
         try:
-            # 상세 페이지에서 바로 정보 추출 시작
             self.logger.info("상세 페이지에서 정보 추출 시작...")
             
             # 이벤트명 추출
             self.logger.info("이벤트명 추출 시도...")
             event_name_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/h1/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > h1 > span'
+                "h1.sc-68757109-2",  # CSS 선택자
+                "//h1[contains(@class, 'sc-68757109-2')]",  # XPath
+                "h1 span"  # 간단한 CSS 선택자
             ]
             
+            event_name = None
             for selector in event_name_selectors:
                 try:
-                    element = self.page.wait_for_selector(selector, timeout=5000)
-                    event_data['event_name'] = element.text.strip()
-                    self.logger.info(f"이벤트명 추출 성공: {event_data['event_name']}")
-                    break
+                    element = self.page.locator(selector).first
+                    if element:
+                        event_name = element.text_content().strip()
+                        self.logger.info(f"이벤트명 추출 성공: {event_name}")
+                        break
                 except Exception as e:
-                    self.logger.debug(f"이벤트명 선택자 {selector} 실패: {str(e)}")
-            
-            # 평점 추출
-            self.logger.info("평점 추출 시도...")
-            rating_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/div/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > div > span'
-            ]
-            
-            for selector in rating_selectors:
-                try:
-                    element = self.page.wait_for_selector(selector, timeout=5000)
-                    event_data['rating'] = element.text.strip()
-                    self.logger.info(f"평점 추출 성공: {event_data['rating']}")
-                    break
-                except Exception as e:
-                    self.logger.debug(f"평점 선택자 {selector} 실패: {str(e)}")
-            
-            # 리뷰 수 추출
-            self.logger.info("리뷰 수 추출 시도...")
-            review_count_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > span'
-            ]
-            
-            for selector in review_count_selectors:
-                try:
-                    element = self.page.wait_for_selector(selector, timeout=5000)
-                    event_data['review_count'] = element.text.strip()
-                    self.logger.info(f"리뷰 수 추출 성공: {event_data['review_count']}")
-                    break
-                except Exception as e:
-                    self.logger.debug(f"리뷰 선택자 {selector} 실패: {str(e)}")
+                    continue
             
             # 병원명 추출
             self.logger.info("병원명 추출 시도...")
-            hospital_name_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[1]/article/div/div/p',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-509fd85f-0.hQTMVb.bVOgYk.jlAXoU > article > div > div > p'
+            hospital_selectors = [
+                "div.sc-509fd85f-0 p",  # CSS 선택자
+                "//div[contains(@class, 'sc-509fd85f-0')]//p",  # XPath
+                "article div p"  # 간단한 CSS 선택자
             ]
             
-            for selector in hospital_name_selectors:
+            hospital_name = None
+            for selector in hospital_selectors:
                 try:
-                    element = self.page.wait_for_selector(selector, timeout=5000)
-                    event_data['hospital_name'] = element.text.strip()
-                    self.logger.info(f"병원명 추출 성공: {event_data['hospital_name']}")
-                    break
+                    element = self.page.locator(selector).first
+                    if element:
+                        hospital_name = element.text_content().strip()
+                        self.logger.info(f"병원명 추출 성공: {hospital_name}")
+                        break
                 except Exception as e:
-                    self.logger.debug(f"병원명 선택자 {selector} 실패: {str(e)}")
+                    continue
             
             # 위치 정보 추출
             self.logger.info("위치 정보 추출 시도...")
             location_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[1]/article/section[2]/div/div/span[1]',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-509fd85f-0.hQTMVb.bVOgYk.jlAXoU > article > section:nth-child(3) > div > div > span:nth-child(2)'
+                "div.sc-509fd85f-0 span",  # CSS 선택자
+                "//div[contains(@class, 'sc-509fd85f-0')]//span",  # XPath
+                "article div span"  # 간단한 CSS 선택자
             ]
             
+            location = None
             for selector in location_selectors:
                 try:
-                    element = self.page.wait_for_selector(selector, timeout=5000)
-                    event_data['location'] = element.text.strip()
-                    self.logger.info(f"위치 정보 추출 성공: {event_data['location']}")
-                    break
+                    element = self.page.locator(selector).first
+                    if element:
+                        location = element.text_content().strip()
+                        self.logger.info(f"위치 정보 추출 성공: {location}")
+                        break
                 except Exception as e:
-                    self.logger.debug(f"위치 정보 선택자 {selector} 실패: {str(e)}")
-            
-            # 문의수와 스크랩수 추출
-            try:
-                # 문의수 추출
-                inquiry_count_selectors = [
-                    '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[4]/div[1]/div/p[2]',
-                    '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-2ad9e729-2.hQTMVb.jrOHqu.bpXUeM > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.iHBozd > div > p.sc-78093dd3-0.sc-78093dd3-1.knAupo.ePvHjs'
-                ]
-                
-                for selector in inquiry_count_selectors:
-                    try:
-                        inquiry_count = self.page.wait_for_selector(selector, timeout=5000).text.strip()
-                        event_data['inquiry_count'] = inquiry_count
-                        self.logger.info(f"문의수 추출 성공: {inquiry_count}")
-                        break
-                    except Exception as e:
-                        self.logger.debug(f"문의수 선택자 {selector} 실패: {str(e)}")
-                        continue
-
-                # 스크랩수 추출
-                scrap_count_selectors = [
-                    '//*[@id="ct-view"]/div/div/section/div[1]/div/p',
-                    '#ct-view > div > div > section > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.dtvKsa > div > p'
-                ]
-                
-                for selector in scrap_count_selectors:
-                    try:
-                        scrap_count = self.page.wait_for_selector(selector, timeout=5000).text.strip()
-                        event_data['scrap_count'] = scrap_count
-                        self.logger.info(f"스크랩수 추출 성공: {scrap_count}")
-                        break
-                    except Exception as e:
-                        self.logger.debug(f"스크랩수 선택자 {selector} 실패: {str(e)}")
-                        continue
-
-            except Exception as e:
-                self.logger.error(f"문의수/스크랩수 추출 실패: {str(e)}")
+                    continue
             
             # 옵션 정보 추출
             self.logger.info("옵션 정보 추출 시도...")
-            options_data = []  # 옵션 정보를 저장할 리스트
             try:
-                # 구매하기 버튼이 있는 섹션 찾기
-                section_selector = '//*[@id="ct-view"]/div/div/section'
-                section = self.page.wait_for_selector(section_selector, timeout=5000)
-                self.logger.info("구매하기 버튼 섹션 찾기 성공")
-
-                # 섹션 내의 모든 버튼 찾기
-                buttons = section.query_selector_all("button")
-                self.logger.info(f"발견된 버튼 수: {len(buttons)}")
-
-                # 버튼 클릭 시도
-                purchase_button_clicked = False
-                if len(buttons) == 1:  # 버튼이 하나만 있는 경우
-                    try:
-                        self.page.evaluate("arguments[0].click();", buttons[0])
-                        self.logger.info("단일 구매하기 버튼 클릭 성공")
-                        purchase_button_clicked = True
-                    except Exception as e:
-                        self.logger.error(f"단일 구매하기 버튼 클릭 실패: {str(e)}")
-                
-                elif len(buttons) >= 2:  # 버튼이 두 개 이상인 경우
-                    try:
-                        self.page.evaluate("arguments[0].click();", buttons[1])  # 두 번째 버튼 클릭
-                        self.logger.info("두 번째 구매하기 버튼 클릭 성공")
-                        purchase_button_clicked = True
-                    except Exception as e:
-                        self.logger.error(f"두 번째 구매하기 버튼 클릭 실패: {str(e)}")
-                
-                if not purchase_button_clicked:
-                    self.logger.error("구매하기 버튼 클릭 실패")
-                    return [event_data]
-
-                time.sleep(2)  # 모달창이 열리기를 기다림
-
-                # 옵션 리스트 컨테이너 찾기
-                options_container_selector = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
-                options_container = self.page.wait_for_selector(options_container_selector, timeout=10000)
-                self.logger.info("옵션 리스트 컨테이너 찾기 성공")
-
-                # 개별 옵션들 찾기
-                idx = 1
-                while True:
-                    try:
-                        # 개별 옵션 영역
-                        option_selector = f"{options_container_selector}/div[{idx}]"
-                        option_element = self.page.wait_for_selector(option_selector, timeout=5000)
-                        
-                        # 옵션명 추출
-                        option_name = option_element.query_selector("div > p").text.strip()
-                        
-                        # 가격 추출
-                        price = option_element.query_selector("p").text.strip()
-                        
-                        # 데이터 저장
-                        option_data = event_data.copy()
-                        option_data['option_name'] = option_name
-                        option_data['price'] = price
-                        options_data.append(option_data)
-                        
-                        self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
-                        idx += 1
-                        
-                    except Exception as e:
-                        self.logger.info(f"총 {idx-1}개의 옵션 추출 완료")
-                        break
-                    except Exception as e:
-                        self.logger.error(f"옵션 {idx} 추출 중 오류 발생: {str(e)}")
-                        break
-                
-                return options_data if options_data else [event_data]
-                
+                # 구매하기 버튼 클릭
+                buy_button = self.page.locator("button:has-text('구매하기')").first
+                if buy_button:
+                    buy_button.click()
+                    self.page.wait_for_timeout(2000)
+                    
+                    # 옵션 목록 추출
+                    option_elements = self.page.locator("div[role='radio']").all()
+                    
+                    for option in option_elements:
+                        try:
+                            option_name = option.locator("p").text_content().strip()
+                            price_element = option.locator("span:last-child").text_content().strip()
+                            
+                            event_data.append({
+                                'hospital_name': hospital_name or "정보 없음",
+                                'location': location or "위치 정보 없음",
+                                'event_name': event_name or "이벤트 정보 없음",
+                                'option_name': option_name,
+                                'price': price_element,
+                                'rating': "N/A",
+                                'review_count': "N/A",
+                                'scrap_count': "N/A",
+                                'inquiry_count': "N/A"
+                            })
+                            
+                            self.logger.info(f"옵션 정보 추출 성공: {option_name} - {price_element}")
+                        except Exception as e:
+                            self.logger.error(f"옵션 정보 추출 실패: {str(e)}")
+                            continue
+                    
             except Exception as e:
-                self.logger.error(f"옵션 정보 처리 실패: {str(e)}")
-                return [event_data]
+                self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
             
-            # 추출된 데이터 확인 로그
-            self.logger.info("추출된 데이터:")
-            for key, value in event_data.items():
-                self.logger.info(f"{key}: {value}")
+            if not event_data:
+                # 옵션 정보를 얻지 못한 경우에도 기본 정보는 저장
+                event_data.append({
+                    'hospital_name': hospital_name or "정보 없음",
+                    'location': location or "위치 정보 없음",
+                    'event_name': event_name or "이벤트 정보 없음",
+                    'option_name': "옵션 정보 없음",
+                    'price': "가격 정보 없음",
+                    'rating': "N/A",
+                    'review_count': "N/A",
+                    'scrap_count': "N/A",
+                    'inquiry_count': "N/A"
+                })
             
             return event_data
             
         except Exception as e:
-            self.logger.error(f"이벤트 상세 정보 추출 중 오류 발생: {str(e)}")
-            return None
+            self.logger.error(f"이벤트 상세 정보 추출 중 오류: {str(e)}")
+            return []
 
     def scrape_data(self, keyword, progress_bar):
         try:
