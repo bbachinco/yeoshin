@@ -2,6 +2,7 @@ wget
 unzip
 fontconfig
 locales
+libgbm1
 libasound2
 libatk1.0-0
 libc6
