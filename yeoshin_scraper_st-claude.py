@@ -360,7 +360,7 @@ class YeoshinScraper:
 
                 # 섹션 내의 모든 버튼 찾기
                 buttons = section.query_selector_all("button")
-                self.logger.info(f"발견된 버튼 ��: {len(buttons)}")
+                self.logger.info(f"발견된 버튼 수: {len(buttons)}")
 
                 # 버튼 클릭 시도
                 purchase_button_clicked = False
@@ -501,16 +501,16 @@ class YeoshinScraper:
                     current_url = self.page.url
                     self.logger.info(f"현재 URL: {current_url}")
                     
-                    # 매번 새로운 이벤트 요소 찾기
+                    # 이벤트 요소 찾기 및 클릭
                     event_selector = (
                         f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
                         else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
                     )
                     
-                    # 이벤트 요소 찾기 및 클릭
                     try:
-                        event = self.page.wait_for_selector(event_selector, timeout=10000)
-                        self.page.evaluate("arguments[0].click();", event)
+                        # click() 메서드 직접 사용
+                        event = self.page.locator(event_selector)
+                        event.click()
                         time.sleep(3)
                         self.logger.info(f"{idx}번째 이벤트 클릭 성공")
                         
@@ -523,7 +523,7 @@ class YeoshinScraper:
                         # 검색 결과 페이지로 돌아가기
                         self.page.goto(current_url)
                         self.wait_for_page_load()
-                        time.sleep(2)  # 페이지 로딩 대기 추가
+                        time.sleep(2)
                         
                     except Exception as e:
                         self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
@@ -615,7 +615,7 @@ def analyze_with_claude(df):
         C. 위치 기반 분석
         1. 지역별 특성
         
-        D. 고객 반응 ��석
+        D. 고객 반응 분석
         1. 고객 반응 상세 분석
         
         분석 시 다음 가이드라인을 준수해주세요:
@@ -850,7 +850,7 @@ def main():
             except Exception as e:
                 st.error(f"PDF 처리 중 오류가 발생했습니다: {str(e)}")
         else:
-            st.warning("검색 결과가 없거나 데이터 형식�� 올바르지 않습니다. 다른 키워드로 시도보세요.")
+            st.warning("검색 결과가 없거나 데이터 형식 올바르지 않습니다. 다른 키워드로 시도보세요.")
 
 if __name__ == "__main__":
     main()
