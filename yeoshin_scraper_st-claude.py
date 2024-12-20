@@ -400,7 +400,7 @@ class YeoshinScraper:
                     return [event_data]
 
                 # 잠시 대기 후 모달창 확인
-                self.page.wait_for_timeout(2000)  # 2초 대기
+                self.page.wait_for_timeout(5000)  # 5초 대기
                 
                 # 여러 가능한 모달창 선택자 시도
                 modal_selectors = [
@@ -431,9 +431,9 @@ class YeoshinScraper:
                     # 옵션 컨테이너 찾기
                     option_container_selectors = [
                         '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
-                        '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0 > div.flex.flex-col.w-[100%].overflow-y-scroll.bg-[#ffffff]',
-                        "//div[contains(@class, 'overflow-y-scroll')]",
-                        "//div[contains(@class, 'flex-col')][contains(@class, 'bg-[#ffffff]')]"
+                        '#ct-view > div > div > div[class*="fixed"] > div > div > div > div[class*="overflow-auto"] > div[class*="flex-col"]',
+                        '//div[contains(@class, "flex-col") and contains(@class, "overflow-y-scroll")]',
+                        '//div[contains(@class, "overflow-auto")]//div[contains(@class, "flex-col")]'
                     ]
 
                     container_found = False
