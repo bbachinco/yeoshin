@@ -177,15 +177,24 @@ class YeoshinScraper:
     def scroll_to_load_all(self):
         """전체 페이지 스크롤"""
         for _ in range(5):
-            self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            self.page.wait_for_timeout(3000)
-            
             try:
+                # 현재 높이 저장
                 previous_height = self.page.evaluate("document.body.scrollHeight")
-                self.page.wait_for_function("""
-                    (height) => document.body.scrollHeight > height
-                """, previous_height, timeout=10000)
+                
+                # 스크롤 수행
+                self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                self.page.wait_for_timeout(3000)
+                
+                # 새로운 컨텐츠가 로드되었는지 확인
+                current_height = self.page.evaluate("document.body.scrollHeight")
+                if current_height == previous_height:
+                    break
+                
             except PlaywrightTimeoutError:
+                self.logger.warning("스크롤 타임아웃")
+                break
+            except Exception as e:
+                self.logger.error(f"스크롤 중 오류 발생: {str(e)}")
                 break
 
     def search_keyword(self, keyword, progress_bar):
@@ -220,7 +229,7 @@ class YeoshinScraper:
         }
         
         try:
-            # 상세 페이지에서 바로 정보 추출 ���작
+            # 상세 페이지에서 바로 정보 추출 시작
             self.logger.info("상세 페이지에서 정보 추출 시작...")
             
             # 이벤트명 추출
@@ -351,7 +360,7 @@ class YeoshinScraper:
 
                 # 섹션 내의 모든 버튼 찾기
                 buttons = section.query_selector_all("button")
-                self.logger.info(f"발견된 버튼 수: {len(buttons)}")
+                self.logger.info(f"발견된 버튼 ��: {len(buttons)}")
 
                 # 버튼 클릭 시도
                 purchase_button_clicked = False
@@ -606,11 +615,11 @@ def analyze_with_claude(df):
         C. 위치 기반 분석
         1. 지역별 특성
         
-        D. 고객 반응 분석
+        D. 고객 반응 ��석
         1. 고객 반응 상세 분석
         
         분석 시 다음 가이드라인을 준수해주세요:
-        1. 실 예시와 수를 근로 들어 분석해주세요.
+        1. 실제 예시와 수를 근로 들어 분석해주세요.
         2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
         3. 분석할 때 주의사항:
             - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
@@ -841,7 +850,7 @@ def main():
             except Exception as e:
                 st.error(f"PDF 처리 중 오류가 발생했습니다: {str(e)}")
         else:
-            st.warning("검색 결과가 없거나 데이터 형식이 올���르지 않습니다. 다른 키워드로 시도보세요.")
+            st.warning("검색 결과가 없거나 데이터 형식�� 올바르지 않습니다. 다른 키워드로 시도보세요.")
 
 if __name__ == "__main__":
     main()
