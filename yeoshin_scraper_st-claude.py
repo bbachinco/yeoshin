@@ -111,9 +111,8 @@ class YeoshinScraper:
     def setup_driver(self):
         """Playwright 설정"""
         try:
-            # Playwright 설치 명령어 실행
-            subprocess.run(['playwright', 'install'], check=True)
-            subprocess.run(['playwright', 'install-deps'], check=True)
+            # Playwright 브라우저만 설치 (의존성 설치 제외)
+            subprocess.run(['playwright', 'install', 'chromium'], check=True)
             
             self.playwright = sync_playwright().start()
             
@@ -122,11 +121,15 @@ class YeoshinScraper:
                 "args": [
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-software-rasterizer",
+                    "--disable-dev-shm-usage",
                     "--start-maximized",
                     "--window-size=1920,1080"
                 ]
             }
             
+            # chromium 브라우저 사용
             self.browser = self.playwright.chromium.launch(**browser_options)
             self.page = self.browser.new_page(
                 viewport={"width": 1920, "height": 1080},
@@ -281,7 +284,7 @@ class YeoshinScraper:
                 try:
                     element = self.page.wait_for_selector(selector, timeout=5000)
                     event_data['hospital_name'] = element.text.strip()
-                    self.logger.info(f"병원명 ���출 성공: {event_data['hospital_name']}")
+                    self.logger.info(f"병원명 추출 성공: {event_data['hospital_name']}")
                     break
                 except Exception as e:
                     self.logger.debug(f"병원명 선택자 {selector} 실패: {str(e)}")
@@ -304,7 +307,7 @@ class YeoshinScraper:
             
             # 문의수와 스크랩수 추출
             try:
-                # 문의수 추출
+                # 문의수 추��
                 inquiry_count_selectors = [
                     '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[4]/div[1]/div/p[2]',
                     '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-2ad9e729-2.hQTMVb.jrOHqu.bpXUeM > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.iHBozd > div > p.sc-78093dd3-0.sc-78093dd3-1.knAupo.ePvHjs'
@@ -354,7 +357,7 @@ class YeoshinScraper:
 
                 # 버튼 클릭 시도
                 purchase_button_clicked = False
-                if len(buttons) == 1:  # ��튼이 하나만 있는 경우
+                if len(buttons) == 1:  # 버튼이 하나만 있는 경우
                     try:
                         self.page.evaluate("arguments[0].click();", buttons[0])
                         self.logger.info("단일 구매하기 버튼 클릭 성공")
@@ -389,7 +392,7 @@ class YeoshinScraper:
                         option_selector = f"{options_container_selector}/div[{idx}]"
                         option_element = self.page.wait_for_selector(option_selector, timeout=5000)
                         
-                        # 옵���명 추출
+                        # 옵션명 추출
                         option_name = option_element.query_selector("div > p").text.strip()
                         
                         # 가격 추출
@@ -451,7 +454,7 @@ class YeoshinScraper:
                 try:
                     container = self.page.wait_for_selector(selector, timeout=10000)
                     if container:
-                        self.logger.info("��색 결과 리스트 컨테이너 찾기 성공")
+                        self.logger.info("검색 결과 리스트 컨테이너 찾기 성공")
                         break
                 except:
                     continue
@@ -609,7 +612,7 @@ def analyze_with_claude(df):
         1. 고객 반응 상세 분석
         
         분석 시 다음 가이드라인을 준수해주세요:
-        1. 실제 예시와 수���를 근로 들어 분석해주세요.
+        1. 실��� 예시와 수를 근로 들어 분석해주세요.
         2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
         3. 분석할 때 주의사항:
             - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
@@ -809,7 +812,7 @@ def main():
                 'rating': '평점',
                 'review_count': '리뷰수',
                 'scrap_count': '스크랩수',
-                'inquiry_count': '문의수',
+                'inquiry_count': '문의���',
                 'detail_link': '상세링크'
             }
             df = df.rename(columns=column_names)
@@ -840,7 +843,7 @@ def main():
             except Exception as e:
                 st.error(f"PDF 처리 중 오류가 발생했습니다: {str(e)}")
         else:
-            st.warning("검색 결과가 없거나 데이터 형식이 올바르지 않습니다. 다른 키워드로 시도해보세요.")
+            st.warning("검색 결과가 없거나 데이터 형식이 올바르지 않습니다. 다른 키워드로 시도���보세요.")
 
 if __name__ == "__main__":
     main()
