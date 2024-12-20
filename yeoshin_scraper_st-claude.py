@@ -426,30 +426,83 @@ class YeoshinScraper:
 
                 self.logger.info("모달창 로딩 완료")
 
-                # 옵션 리스트 컨테이너 찾기
-                options_container_selector = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
-                options_container = self.page.locator(options_container_selector)
-                
-                # 개별 옵션들 찾기
-                option_elements = options_container.locator("div").all()
-                
-                for idx, option in enumerate(option_elements, 1):
-                    try:
-                        option_name = option.locator("div > p").text_content().strip()
-                        price = option.locator("p").text_content().strip()
-                        
-                        option_data = event_data.copy()
-                        option_data['option_name'] = option_name
-                        option_data['price'] = price
-                        options_data.append(option_data)
-                        
-                        self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
-                        
-                    except Exception as e:
-                        self.logger.error(f"옵션 {idx} 추출 중 오류 발생: {str(e)}")
-                        continue
+                # 옵션 정보 추출 시도
+                try:
+                    # 옵션 컨테이너 찾기
+                    option_container_selectors = [
+                        "//div[contains(@class, 'modal') or contains(@class, 'popup')]//div[contains(@class, 'option')]",
+                        "//div[contains(@class, 'modal') or contains(@class, 'popup')]//div[contains(@class, 'list')]",
+                        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
+                    ]
 
-                return options_data if options_data else [event_data]
+                    container_found = False
+                    for selector in option_container_selectors:
+                        try:
+                            options_container = self.page.locator(selector)
+                            if options_container.count() > 0:
+                                self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
+                                container_found = True
+                                break
+                        except Exception as e:
+                            self.logger.debug(f"옵션 컨테이너 선택자 {selector} 실패: {str(e)}")
+                            continue
+
+                    if not container_found:
+                        self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
+                        return [event_data]
+
+                    # 개별 옵션 요소들 찾기
+                    options = options_container.locator("div").all()
+                    self.logger.info(f"발견된 옵션 수: {len(options)}")
+
+                    for idx, option in enumerate(options, 1):
+                        try:
+                            # 옵션명과 가격 추출 시도
+                            option_name_selectors = ["div > p", "p:first-child", ".option-name"]
+                            price_selectors = ["p:last-child", ".price", "p"]
+
+                            # 옵션명 추출
+                            option_name = None
+                            for name_selector in option_name_selectors:
+                                try:
+                                    name_element = option.locator(name_selector).first
+                                    if name_element:
+                                        option_name = name_element.text_content().strip()
+                                        break
+                                except:
+                                    continue
+
+                            # 가격 추출
+                            price = None
+                            for price_selector in price_selectors:
+                                try:
+                                    price_element = option.locator(price_selector).last
+                                    if price_element:
+                                        price = price_element.text_content().strip()
+                                        break
+                                except:
+                                    continue
+
+                            if option_name and price:
+                                option_data = event_data.copy()
+                                option_data['option_name'] = option_name
+                                option_data['price'] = price
+                                options_data.append(option_data)
+                                self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+
+                        except Exception as e:
+                            self.logger.error(f"옵션 {idx} 추출 실패: {str(e)}")
+                            continue
+
+                    if not options_data:
+                        self.logger.warning("추출된 옵션 정보가 없습니다")
+                        return [event_data]
+
+                    return options_data
+
+                except Exception as e:
+                    self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
+                    return [event_data]
 
             except Exception as e:
                 self.logger.error(f"옵션 정보 처리 실패: {str(e)}")
