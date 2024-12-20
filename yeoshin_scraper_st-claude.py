@@ -182,11 +182,9 @@ class YeoshinScraper:
             
             try:
                 previous_height = self.page.evaluate("document.body.scrollHeight")
-                self.page.wait_for_function(
-                    "document.body.scrollHeight > arguments[0]",
-                    previous_height,
-                    timeout=10000
-                )
+                self.page.wait_for_function("""
+                    (height) => document.body.scrollHeight > height
+                """, previous_height, timeout=10000)
             except PlaywrightTimeoutError:
                 break
 
@@ -222,7 +220,7 @@ class YeoshinScraper:
         }
         
         try:
-            # 상세 페이지에서 바로 정보 추출 시작
+            # 상세 페이지에서 바로 정보 추출 ���작
             self.logger.info("상세 페이지에서 정보 추출 시작...")
             
             # 이벤트명 추출
@@ -307,7 +305,7 @@ class YeoshinScraper:
             
             # 문의수와 스크랩수 추출
             try:
-                # 문의수 추��
+                # 문의수 추출
                 inquiry_count_selectors = [
                     '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[4]/div[1]/div/p[2]',
                     '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-2ad9e729-2.hQTMVb.jrOHqu.bpXUeM > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.iHBozd > div > p.sc-78093dd3-0.sc-78093dd3-1.knAupo.ePvHjs'
@@ -612,7 +610,7 @@ def analyze_with_claude(df):
         1. 고객 반응 상세 분석
         
         분석 시 다음 가이드라인을 준수해주세요:
-        1. 실��� 예시와 수를 근로 들어 분석해주세요.
+        1. 실 예시와 수를 근로 들어 분석해주세요.
         2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
         3. 분석할 때 주의사항:
             - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
@@ -812,7 +810,7 @@ def main():
                 'rating': '평점',
                 'review_count': '리뷰수',
                 'scrap_count': '스크랩수',
-                'inquiry_count': '문의���',
+                'inquiry_count': '문의수',
                 'detail_link': '상세링크'
             }
             df = df.rename(columns=column_names)
@@ -843,7 +841,7 @@ def main():
             except Exception as e:
                 st.error(f"PDF 처리 중 오류가 발생했습니다: {str(e)}")
         else:
-            st.warning("검색 결과가 없거나 데이터 형식이 올바르지 않습니다. 다른 키워드로 시도���보세요.")
+            st.warning("검색 결과가 없거나 데이터 형식이 올���르지 않습니다. 다른 키워드로 시도보세요.")
 
 if __name__ == "__main__":
     main()
