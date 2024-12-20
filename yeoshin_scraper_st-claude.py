@@ -372,8 +372,8 @@ class YeoshinScraper:
                 self.logger.info("구매하기 버튼 섹션 찾기 성공")
 
                 # 섹션 내의 모든 버튼 찾기
-                buttons = section.locator("button").all()
-                button_count = len(buttons)
+                buttons = section.locator("button")
+                button_count = buttons.count()
                 self.logger.info(f"발견된 버튼 수: {button_count}")
 
                 # 버튼 클릭 시도
@@ -381,8 +381,7 @@ class YeoshinScraper:
                 
                 if button_count == 1:
                     try:
-                        # JavaScript를 통한 클릭
-                        self.page.evaluate("buttons => buttons[0].click()", buttons)
+                        buttons.first.click()
                         self.logger.info("단일 구매하기 버튼 클릭 성공")
                         purchase_button_clicked = True
                     except Exception as e:
@@ -390,8 +389,7 @@ class YeoshinScraper:
                 
                 elif button_count >= 2:
                     try:
-                        # JavaScript를 통한 클릭
-                        self.page.evaluate("buttons => buttons[1].click()", buttons)
+                        buttons.nth(1).click()  # 두 번째 버튼 클릭
                         self.logger.info("두 번째 구매하기 버튼 클릭 성공")
                         purchase_button_clicked = True
                     except Exception as e:
