@@ -313,6 +313,46 @@ class YeoshinScraper:
                 except Exception as e:
                     continue
 
+            # 평점 추출
+            self.logger.info("평점 추출 시도...")
+            rating_selectors = [
+                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/div/span',
+                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > div > span'
+            ]
+
+            # 리뷰 수 추출
+            self.logger.info("리뷰 수 추출 시도...")
+            review_count_selectors = [
+                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/span',
+                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > span'
+            ]
+
+            # 각 정보 추출 시도 (기존 코드에 추가)
+            rating = None
+            review_count = None
+
+            # 평점 추출
+            for selector in rating_selectors:
+                try:
+                    element = self.page.locator(selector).first
+                    if element:
+                        rating = element.text_content().strip()
+                        self.logger.info(f"평점 추출 성공 - 값: {rating}")
+                        break
+                except Exception as e:
+                    continue
+
+            # 리뷰 수 추출
+            for selector in review_count_selectors:
+                try:
+                    element = self.page.locator(selector).first
+                    if element:
+                        review_count = element.text_content().strip()
+                        self.logger.info(f"리뷰 수 추출 성공 - 값: {review_count}")
+                        break
+                except Exception as e:
+                    continue
+
             # 옵션 정보 추출
             self.logger.info("옵션 정보 추출 시도...")
             try:
@@ -346,7 +386,9 @@ class YeoshinScraper:
                                 'option_name': option_name,
                                 'price': price,
                                 'inquiry_count': inquiry_count or "N/A",
-                                'scrap_count': scrap_count or "N/A"
+                                'scrap_count': scrap_count or "N/A",
+                                'rating': rating or "N/A",
+                                'review_count': review_count or "N/A"
                             })
                             
                             self.logger.info(f"옵션 정보 추출 성공: {option_name} - {price}")
@@ -365,6 +407,8 @@ class YeoshinScraper:
                     'event_name': event_name or "이벤트 정보 없음",
                     'option_name': "옵션 정보 없음",
                     'price': "가격 정보 없음",
+                    'rating': rating or "N/A",
+                    'review_count': review_count or "N/A",
                     'inquiry_count': inquiry_count or "N/A",
                     'scrap_count': scrap_count or "N/A"
                 })
@@ -428,7 +472,7 @@ class YeoshinScraper:
             # 모든 이벤트의 데이터를 저장할 리스트
             all_events_data = []
             
-            # 각 이벤트마다 상세 정보 수집
+            # 각 이벤트마다 상세 정보 ���집
             for idx in range(1, total_items + 1):
                 try:
                     self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{total_items}) ===")
