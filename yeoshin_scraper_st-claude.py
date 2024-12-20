@@ -223,65 +223,137 @@ class YeoshinScraper:
             # 이벤트명 추출
             self.logger.info("이벤트명 추출 시도...")
             event_name_selectors = [
-                "h1.sc-68757109-2",  # CSS 선택자
-                "//h1[contains(@class, 'sc-68757109-2')]",  # XPath
-                "h1 span"  # 간단한 CSS 선택자
+                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/h1/span',
+                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > h1 > span'
             ]
             
+            # 병원명 추출
+            self.logger.info("병원명 추출 시도...")
+            hospital_name_selectors = [
+                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[1]/article/div/div/p',
+                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-509fd85f-0.hQTMVb.bVOgYk.jlAXoU > article > div > div > p'
+            ]
+            
+            # 위치 정보 추출
+            self.logger.info("위치 정보 추출 시도...")
+            location_selectors = [
+                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[1]/article/section[2]/div/div/span[1]',
+                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-509fd85f-0.hQTMVb.bVOgYk.jlAXoU > article > section:nth-child(3) > div > div > span:nth-child(2)'
+            ]
+
+            # 문의수 추출
+            self.logger.info("문의수 추출 시도...")
+            inquiry_count_selectors = [
+                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[4]/div[1]/div/p[2]',
+                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-2ad9e729-2.hQTMVb.jrOHqu.bpXUeM > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.iHBozd > div > p.sc-78093dd3-0.sc-78093dd3-1.knAupo.ePvHjs'
+            ]
+
+            # 스크랩수 추출
+            self.logger.info("스크랩수 추출 시도...")
+            scrap_count_selectors = [
+                '//*[@id="ct-view"]/div/div/section/div[1]/div/p',
+                '#ct-view > div > div > section > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.dtvKsa > div > p'
+            ]
+
+            # 각 정보 추출
             event_name = None
+            hospital_name = None
+            location = None
+            inquiry_count = None
+            scrap_count = None
+
+            # 각 선택자로 정보 추출 시도
             for selector in event_name_selectors:
                 try:
                     element = self.page.locator(selector).first
                     if element:
                         event_name = element.text_content().strip()
-                        self.logger.info(f"이벤트명 추출 성공 - 선택자: {selector}, 값: {event_name}")
+                        self.logger.info(f"이벤트명 추출 성공 - 값: {event_name}")
                         break
                 except Exception as e:
-                    self.logger.info(f"이벤트명 추출 실패 - 선택자: {selector}, 오류: {str(e)}")
                     continue
-            
-            # 병원명 추출 (임시로 비워둠)
-            self.logger.info("병원명 추출 시도...")
-            hospital_name = "정보 없음"
-            
-            # 위치 정보 추출 (임시로 비워둠)
-            self.logger.info("위치 정보 추출 시도...")
-            location = "위치 정보 없음"
-            
+
+            for selector in hospital_name_selectors:
+                try:
+                    element = self.page.locator(selector).first
+                    if element:
+                        hospital_name = element.text_content().strip()
+                        self.logger.info(f"병원명 추출 성공 - 값: {hospital_name}")
+                        break
+                except Exception as e:
+                    continue
+
+            for selector in location_selectors:
+                try:
+                    element = self.page.locator(selector).first
+                    if element:
+                        location = element.text_content().strip()
+                        self.logger.info(f"위치 정보 추출 성공 - 값: {location}")
+                        break
+                except Exception as e:
+                    continue
+
+            for selector in inquiry_count_selectors:
+                try:
+                    element = self.page.locator(selector).first
+                    if element:
+                        inquiry_count = element.text_content().strip()
+                        self.logger.info(f"문의수 추출 성공 - 값: {inquiry_count}")
+                        break
+                except Exception as e:
+                    continue
+
+            for selector in scrap_count_selectors:
+                try:
+                    element = self.page.locator(selector).first
+                    if element:
+                        scrap_count = element.text_content().strip()
+                        self.logger.info(f"스크랩수 추출 성공 - 값: {scrap_count}")
+                        break
+                except Exception as e:
+                    continue
+
             # 옵션 정보 추출
             self.logger.info("옵션 정보 추출 시도...")
             try:
+                # 구매하기 버튼 섹션 찾기
+                section_selector = '//*[@id="ct-view"]/div/div/section'
+                section = self.page.locator(section_selector)
+                self.logger.info("구매하기 버튼 섹션 찾기 성공")
+
                 # 구매하기 버튼 클릭
-                buy_button = self.page.locator("button:has-text('구매하기')").first
+                buy_button = section.locator("button").nth(1)  # 두 번째 버튼 선택
                 if buy_button:
                     buy_button.click()
-                    self.page.wait_for_timeout(2000)
-                    
-                    # 옵션 목록 추출
-                    option_elements = self.page.locator("div[role='radio']").all()
+                    self.page.wait_for_timeout(2000)  # 모달창이 열리기를 기다림
+
+                    # 옵션 리스트 컨테이너 찾기
+                    options_container_selector = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
+                    options_container = self.page.locator(options_container_selector)
+
+                    # 개별 옵션들 찾기
+                    option_elements = options_container.locator("div").all()
                     
                     for option in option_elements:
                         try:
-                            option_name = option.locator("p").text_content().strip()
-                            price_element = option.locator("span:last-child").text_content().strip()
+                            option_name = option.locator("div > p").text_content().strip()
+                            price = option.locator("p").text_content().strip()
                             
                             event_data.append({
                                 'hospital_name': hospital_name or "정보 없음",
                                 'location': location or "위치 정보 없음",
                                 'event_name': event_name or "이벤트 정보 없음",
                                 'option_name': option_name,
-                                'price': price_element,
-                                'rating': "N/A",
-                                'review_count': "N/A",
-                                'scrap_count': "N/A",
-                                'inquiry_count': "N/A"
+                                'price': price,
+                                'inquiry_count': inquiry_count or "N/A",
+                                'scrap_count': scrap_count or "N/A"
                             })
                             
-                            self.logger.info(f"옵션 정보 추출 성공: {option_name} - {price_element}")
+                            self.logger.info(f"옵션 정보 추출 성공: {option_name} - {price}")
                         except Exception as e:
                             self.logger.error(f"옵션 정보 추출 실패: {str(e)}")
                             continue
-                    
+
             except Exception as e:
                 self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
             
@@ -293,10 +365,8 @@ class YeoshinScraper:
                     'event_name': event_name or "이벤트 정보 없음",
                     'option_name': "옵션 정보 없음",
                     'price': "가격 정보 없음",
-                    'rating': "N/A",
-                    'review_count': "N/A",
-                    'scrap_count': "N/A",
-                    'inquiry_count': "N/A"
+                    'inquiry_count': inquiry_count or "N/A",
+                    'scrap_count': scrap_count or "N/A"
                 })
             
             return event_data
