@@ -432,7 +432,9 @@ class YeoshinScraper:
                     option_container_selectors = [
                         "//div[contains(@class, 'modal') or contains(@class, 'popup')]//div[contains(@class, 'option')]",
                         "//div[contains(@class, 'modal') or contains(@class, 'popup')]//div[contains(@class, 'list')]",
-                        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
+                        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
+                        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]',
+                        '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0'
                     ]
 
                     container_found = False
