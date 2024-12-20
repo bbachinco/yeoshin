@@ -7,19 +7,12 @@ import io
 import re
 from dotenv import load_dotenv
 import tempfile
-import subprocess
 
 # Anthropic 관련
 from anthropic import Anthropic
 
-# Selenium 관련
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+# Playwright 관련
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 # 데이터 처리 및 시각화
 import pandas as pd
@@ -43,7 +36,9 @@ load_dotenv()
 class YeoshinScraper:
     def __init__(self):
         self.results = []
-        self.driver = None
+        self.page = None
+        self.browser = None
+        self.playwright = None
         self.current_keyword = None
         self.setup_logging()
         
@@ -52,15 +47,23 @@ class YeoshinScraper:
         self.cleanup()
     
     def cleanup(self):
-        """드라이버 정리를 위한 메서드"""
-        if self.driver:
+        """브라우저 정리를 위한 메서드"""
+        if self.page:
             try:
-                self.driver.quit()
+                self.page.close()
             except Exception as e:
-                self.logger.error(f"드라이버 종료 중 오류: {str(e)}")
-            finally:
-                self.driver = None
-        
+                self.logger.error(f"페이지 종료 중 오류: {str(e)}")
+        if self.browser:
+            try:
+                self.browser.close()
+            except Exception as e:
+                self.logger.error(f"브라우저 종료 중 오류: {str(e)}")
+        if self.playwright:
+            try:
+                self.playwright.stop()
+            except Exception as e:
+                self.logger.error(f"Playwright 종료 중 오류: {str(e)}")
+
     def setup_logging(self):
         """로깅 설정"""
         logging.basicConfig(
@@ -73,10 +76,8 @@ class YeoshinScraper:
     def check_login_status(self):
         """로그인 상태 확인"""
         try:
-            self.driver.get("https://www.yeoshin.co.kr/myPage")
-            time.sleep(3)
+            self.page.goto("https://www.yeoshin.co.kr/myPage")
             
-            # 여러 선택자를 시도
             selectors = [
                 "#ct-view > div > div > div.sc-d64fbdbd-0.IeGIQ > a",
                 '//*[@id="ct-view"]/div/div/div[1]/a',
@@ -86,24 +87,19 @@ class YeoshinScraper:
             
             for selector in selectors:
                 try:
-                    element = WebDriverWait(self.driver, 10).until(
-                        EC.presence_of_element_located(
-                            (By.CSS_SELECTOR, selector) if '/' not in selector 
-                            else (By.XPATH, selector)
-                        )
-                    )
-                    if element.is_displayed():
+                    element = self.page.wait_for_selector(selector, timeout=10000)
+                    if element and element.is_visible():
                         self.logger.info(f"로그인 확인 성공: {selector}")
                         return True
                 except:
                     continue
             
             # 로그인 버튼 확인
-            login_button = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='login']")
+            login_button = self.page.query_selector("a[href*='login']")
             if login_button:
                 self.logger.error("로그인 상태 확인: 로그인되지 않음")
                 return False
-                
+            
             self.logger.error("로그인 상태를 확인할 수 없습니다")
             return False
                 
@@ -112,98 +108,86 @@ class YeoshinScraper:
             return False
 
     def setup_driver(self):
-        """드라이버 설정"""
+        """Playwright 설정"""
         try:
-            options = webdriver.ChromeOptions()
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--headless=new')
-            options.add_argument('--disable-gpu')
+            self.playwright = sync_playwright().start()
             
-            # Streamlit Cloud 환경에서 필요한 추가 옵션
-            options.binary_location = "/usr/bin/chromium-browser"
+            browser_options = {
+                "headless": True,
+                "args": [
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--start-maximized",
+                    "--window-size=1920,1080"
+                ]
+            }
             
-            service = Service(executable_path="/usr/lib/chromium-browser/chromedriver")
-            
-            self.driver = webdriver.Chrome(service=service, options=options)
-            self.wait = WebDriverWait(self.driver, 20)
-            self.logger.info("Chrome 드라이버 설정 완료")
+            self.browser = self.playwright.chromium.launch(**browser_options)
+            self.page = self.browser.new_page(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+            )
             
             # 쿠키 설정
-            self.driver.get("https://www.yeoshin.co.kr")
-            time.sleep(5)
-
+            self.page.goto("https://www.yeoshin.co.kr")
+            
             cookies = [
-                {"name": "_kau", "value": os.getenv("_kau")},
-                {"name": "_kahai", "value": os.getenv("_kahai")},
-                {"name": "_karmt", "value": os.getenv("_karmt")},
-                {"name": "_kawlt", "value": os.getenv("_kawlt")},
-                {"name": "access_token", "value": os.getenv("ACCESS_TOKEN")}
+                {"name": "_kau", "value": os.getenv("_kau"), "domain": ".yeoshin.co.kr", "path": "/"},
+                {"name": "_kahai", "value": os.getenv("_kahai"), "domain": ".yeoshin.co.kr", "path": "/"},
+                {"name": "_karmt", "value": os.getenv("_karmt"), "domain": ".yeoshin.co.kr", "path": "/"},
+                {"name": "_kawlt", "value": os.getenv("_kawlt"), "domain": ".yeoshin.co.kr", "path": "/"},
+                {"name": "access_token", "value": os.getenv("ACCESS_TOKEN"), "domain": ".yeoshin.co.kr", "path": "/"}
             ]
 
             for cookie in cookies:
                 if cookie["value"] is None:
                     self.logger.warning(f"Missing cookie value for: {cookie['name']}")
                     continue
-                    
-                cookie.update({
-                    "domain": ".yeoshin.co.kr",
-                    "path": "/"
-                })
-                  
                 try:
-                    self.driver.add_cookie(cookie)
+                    self.page.context.add_cookies([cookie])
                     self.logger.info(f"쿠키 설정 성공: {cookie['name']}")
                 except Exception as e:
                     self.logger.error(f"쿠키 설정 실패 ({cookie['name']}): {str(e)}")
 
-            self.driver.refresh()
-            time.sleep(2)
-
+            self.page.reload()
+            
             if not self.check_login_status():
                 raise Exception("로그인 상태 확인 실패")
 
         except Exception as e:
-            self.logger.error(f"Driver setup error: {str(e)}")
+            self.logger.error(f"Playwright setup error: {str(e)}")
             raise e
 
-    def wait_for_page_load(self, timeout=30):
+    def wait_for_page_load(self, timeout=30000):
         """페이지 로딩 대기"""
         try:
-            WebDriverWait(self.driver, timeout).until(
-                lambda d: d.execute_script("return document.readyState") == "complete"
-            )
-            time.sleep(5)
-        except TimeoutException:
+            self.page.wait_for_load_state("networkidle", timeout=timeout)
+            self.page.wait_for_timeout(5000)
+        except PlaywrightTimeoutError:
             self.logger.warning("페이지 로딩 시간 초과")
 
     def scroll_to_load_all(self):
         """전체 페이지 스크롤"""
-        SCROLL_PAUSE_TIME = 3
-        last_height = self.driver.execute_script("return document.body.scrollHeight")
-        
         for _ in range(5):
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(SCROLL_PAUSE_TIME)
+            self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            self.page.wait_for_timeout(3000)
             
             try:
-                WebDriverWait(self.driver, 10).until(
-                    lambda driver: driver.execute_script("return document.body.scrollHeight") > last_height
+                previous_height = self.page.evaluate("document.body.scrollHeight")
+                self.page.wait_for_function(
+                    "document.body.scrollHeight > arguments[0]",
+                    previous_height,
+                    timeout=10000
                 )
-            except TimeoutException:
+            except PlaywrightTimeoutError:
                 break
-                
-            new_height = self.driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
-                break
-            last_height = new_height
 
     def search_keyword(self, keyword, progress_bar):
         """키워드 검색"""
         try:
             self.current_keyword = keyword
             search_url = f"https://www.yeoshin.co.kr/search/category?q={keyword}&tab=events"
-            self.driver.get(search_url)
+            self.page.goto(search_url)
             self.wait_for_page_load()
             progress_bar.progress(0.2)
             
@@ -242,12 +226,7 @@ class YeoshinScraper:
             
             for selector in event_name_selectors:
                 try:
-                    element = WebDriverWait(self.driver, 5).until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, selector) if selector.startswith('/')
-                            else (By.CSS_SELECTOR, selector)
-                        )
-                    )
+                    element = self.page.wait_for_selector(selector, timeout=5000)
                     event_data['event_name'] = element.text.strip()
                     self.logger.info(f"이벤트명 추출 성공: {event_data['event_name']}")
                     break
@@ -263,12 +242,7 @@ class YeoshinScraper:
             
             for selector in rating_selectors:
                 try:
-                    element = WebDriverWait(self.driver, 5).until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, selector) if selector.startswith('/')
-                            else (By.CSS_SELECTOR, selector)
-                        )
-                    )
+                    element = self.page.wait_for_selector(selector, timeout=5000)
                     event_data['rating'] = element.text.strip()
                     self.logger.info(f"평점 추출 성공: {event_data['rating']}")
                     break
@@ -284,12 +258,7 @@ class YeoshinScraper:
             
             for selector in review_count_selectors:
                 try:
-                    element = WebDriverWait(self.driver, 5).until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, selector) if selector.startswith('/')
-                            else (By.CSS_SELECTOR, selector)
-                        )
-                    )
+                    element = self.page.wait_for_selector(selector, timeout=5000)
                     event_data['review_count'] = element.text.strip()
                     self.logger.info(f"리뷰 수 추출 성공: {event_data['review_count']}")
                     break
@@ -305,12 +274,7 @@ class YeoshinScraper:
             
             for selector in hospital_name_selectors:
                 try:
-                    element = WebDriverWait(self.driver, 5).until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, selector) if selector.startswith('/')
-                            else (By.CSS_SELECTOR, selector)
-                        )
-                    )
+                    element = self.page.wait_for_selector(selector, timeout=5000)
                     event_data['hospital_name'] = element.text.strip()
                     self.logger.info(f"병원명 추출 성공: {event_data['hospital_name']}")
                     break
@@ -326,12 +290,7 @@ class YeoshinScraper:
             
             for selector in location_selectors:
                 try:
-                    element = WebDriverWait(self.driver, 5).until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, selector) if selector.startswith('/')
-                            else (By.CSS_SELECTOR, selector)
-                        )
-                    )
+                    element = self.page.wait_for_selector(selector, timeout=5000)
                     event_data['location'] = element.text.strip()
                     self.logger.info(f"위치 정보 추출 성공: {event_data['location']}")
                     break
@@ -348,12 +307,7 @@ class YeoshinScraper:
                 
                 for selector in inquiry_count_selectors:
                     try:
-                        inquiry_count = WebDriverWait(self.driver, 5).until(
-                            EC.presence_of_element_located(
-                                (By.XPATH, selector) if selector.startswith('/')
-                                else (By.CSS_SELECTOR, selector)
-                            )
-                        ).text.strip()
+                        inquiry_count = self.page.wait_for_selector(selector, timeout=5000).text.strip()
                         event_data['inquiry_count'] = inquiry_count
                         self.logger.info(f"문의수 추출 성공: {inquiry_count}")
                         break
@@ -369,12 +323,7 @@ class YeoshinScraper:
                 
                 for selector in scrap_count_selectors:
                     try:
-                        scrap_count = WebDriverWait(self.driver, 5).until(
-                            EC.presence_of_element_located(
-                                (By.XPATH, selector) if selector.startswith('/')
-                                else (By.CSS_SELECTOR, selector)
-                            )
-                        ).text.strip()
+                        scrap_count = self.page.wait_for_selector(selector, timeout=5000).text.strip()
                         event_data['scrap_count'] = scrap_count
                         self.logger.info(f"스크랩수 추출 성공: {scrap_count}")
                         break
@@ -391,20 +340,18 @@ class YeoshinScraper:
             try:
                 # 구매하기 버튼이 있는 섹션 찾기
                 section_selector = '//*[@id="ct-view"]/div/div/section'
-                section = WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.XPATH, section_selector))
-                )
+                section = self.page.wait_for_selector(section_selector, timeout=5000)
                 self.logger.info("구매하기 버튼 섹션 찾기 성공")
 
                 # 섹션 내의 모든 버튼 찾기
-                buttons = section.find_elements(By.TAG_NAME, "button")
+                buttons = section.query_selector_all("button")
                 self.logger.info(f"발견된 버튼 수: {len(buttons)}")
 
                 # 버튼 클릭 시도
                 purchase_button_clicked = False
-                if len(buttons) == 1:  # 버튼��� 하나만 있는 경우
+                if len(buttons) == 1:  # 버튼이 하나만 있는 경우
                     try:
-                        self.driver.execute_script("arguments[0].click();", buttons[0])
+                        self.page.evaluate("arguments[0].click();", buttons[0])
                         self.logger.info("단일 구매하기 버튼 클릭 성공")
                         purchase_button_clicked = True
                     except Exception as e:
@@ -412,7 +359,7 @@ class YeoshinScraper:
                 
                 elif len(buttons) >= 2:  # 버튼이 두 개 이상인 경우
                     try:
-                        self.driver.execute_script("arguments[0].click();", buttons[1])  # 두 번째 버튼 클릭
+                        self.page.evaluate("arguments[0].click();", buttons[1])  # 두 번째 버튼 클릭
                         self.logger.info("두 번째 구매하기 버튼 클릭 성공")
                         purchase_button_clicked = True
                     except Exception as e:
@@ -426,9 +373,7 @@ class YeoshinScraper:
 
                 # 옵션 리스트 컨테이너 찾기
                 options_container_selector = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
-                options_container = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, options_container_selector))
-                )
+                options_container = self.page.wait_for_selector(options_container_selector, timeout=10000)
                 self.logger.info("옵션 리스트 컨테이너 찾기 성공")
 
                 # 개별 옵션들 찾기
@@ -437,17 +382,13 @@ class YeoshinScraper:
                     try:
                         # 개별 옵션 영역
                         option_selector = f"{options_container_selector}/div[{idx}]"
-                        option_element = self.driver.find_element(By.XPATH, option_selector)
+                        option_element = self.page.wait_for_selector(option_selector, timeout=5000)
                         
                         # 옵션명 추출
-                        option_name = option_element.find_element(
-                            By.XPATH, f"{option_selector}/div/p"
-                        ).text.strip()
+                        option_name = option_element.query_selector("div > p").text.strip()
                         
                         # 가격 추출
-                        price = option_element.find_element(
-                            By.XPATH, f"{option_selector}/p"
-                        ).text.strip()
+                        price = option_element.query_selector("p").text.strip()
                         
                         # 데이터 저장
                         option_data = event_data.copy()
@@ -458,7 +399,7 @@ class YeoshinScraper:
                         self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
                         idx += 1
                         
-                    except NoSuchElementException:
+                    except Exception as e:
                         self.logger.info(f"총 {idx-1}개의 옵션 추출 완료")
                         break
                     except Exception as e:
@@ -503,12 +444,7 @@ class YeoshinScraper:
             container = None
             for selector in list_container_selectors:
                 try:
-                    container = WebDriverWait(self.driver, 10).until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, selector) if selector.startswith('/')
-                            else (By.CSS_SELECTOR, selector)
-                        )
-                    )
+                    container = self.page.wait_for_selector(selector, timeout=10000)
                     if container:
                         self.logger.info("검색 결과 리스트 컨테이너 찾기 성공")
                         break
@@ -516,7 +452,7 @@ class YeoshinScraper:
                     continue
                 
             if not container:
-                raise Exception("검색 결과 리스트 컨테이너를 찾을 수 ��습니다")
+                raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
             
             # 컨테이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
             events = []
@@ -527,14 +463,11 @@ class YeoshinScraper:
                         f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
                         else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
                     )
-                    event = self.driver.find_element(
-                        By.XPATH if list_container_selectors[0].startswith('/') else By.CSS_SELECTOR,
-                        event_selector
-                    )
+                    event = self.page.wait_for_selector(event_selector, timeout=10000)
                     events.append(event)
                     self.logger.info(f"{idx}번째 이벤트 요소 찾기 성공")
                     idx += 1
-                except NoSuchElementException:
+                except Exception as e:
                     break
             
             total_items = len(events)
@@ -546,11 +479,11 @@ class YeoshinScraper:
             # 각 이벤트마다 상세 정보 수집
             for idx in range(1, total_items + 1):
                 try:
-                    self.logger.info(f"\n=== {idx}번째 이벤트 수집 시작 ({idx}/{total_items}) ===")
+                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{total_items}) ===")
                     progress_value = 0.3 + (0.7 * (idx / total_items))
                     
                     # 현재 URL 저장
-                    current_url = self.driver.current_url
+                    current_url = self.page.url
                     self.logger.info(f"현재 URL: {current_url}")
                     
                     # 매번 새로운 이벤트 요소 찾기
@@ -561,13 +494,8 @@ class YeoshinScraper:
                     
                     # 이벤트 요소 찾기 및 클릭
                     try:
-                        event = WebDriverWait(self.driver, 10).until(
-                            EC.element_to_be_clickable(
-                                (By.XPATH if list_container_selectors[0].startswith('/') else By.CSS_SELECTOR,
-                                event_selector)
-                            )
-                        )
-                        self.driver.execute_script("arguments[0].click();", event)
+                        event = self.page.wait_for_selector(event_selector, timeout=10000)
+                        self.page.evaluate("arguments[0].click();", event)
                         time.sleep(3)
                         self.logger.info(f"{idx}번째 이벤트 클릭 성공")
                         
@@ -578,7 +506,7 @@ class YeoshinScraper:
                             self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
                         
                         # 검색 결과 페이지로 돌아가기
-                        self.driver.get(current_url)
+                        self.page.goto(current_url)
                         self.wait_for_page_load()
                         time.sleep(2)  # 페이지 로딩 대기 추가
                         
@@ -666,7 +594,7 @@ def analyze_with_claude(df):
         3. 평균 옵션 개수 분석
         
         B. 첫 번째 옵션 분석
-        1. 일반���인 첫 번째 옵션 패턴
+        1. 일반적인 첫 번째 옵션 패턴
         2. 가격 비교
         
         C. 위치 기반 분석
@@ -701,7 +629,7 @@ def analyze_with_claude(df):
             
             sections = {
                 "A": "옵션 분석 📊",
-                "B": "첫 번째 옵션 분��� 💰",
+                "B": "첫 번째 옵션 분석 💰",
                 "C": "위치 기반 분석 📍",
                 "D": "고객 반응 분석 👥"
             }
@@ -715,7 +643,7 @@ def analyze_with_claude(df):
                     section_content = content[section_start:section_end].strip()
                     st.markdown(section_content)
             
-            # 핵심 제언 시
+            # 핵심 제언 표시
             if "핵 제언" in content:
                 st.subheader("💡 새로운 이벤트 등록을 위한 핵심 제언")
                 recommendations = content[content.find("핵심 제언"):].split("\n")
@@ -730,7 +658,7 @@ def analyze_with_claude(df):
             return "분석 결과를 표시할 수 없습니다."
             
     except Exception as e:
-        st.error(f"Claude AI 분석 중 오류�� 발생했습니다: {str(e)}")
+        st.error(f"Claude AI 분석 중 오류가 발생했습니다: {str(e)}")
         return "분석을 행할 수 없습니다."
 
 
@@ -772,7 +700,7 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         elements.append(Paragraph('스크래핑 데이터', styles['KoreanHeading1']))
         elements.append(Spacer(1, 20))
         
-        # 데이터 테이블 성
+        # 데이터 테이블 생성
         col_names = {
             'hospital_name': '병원명',
             'location': '치',
