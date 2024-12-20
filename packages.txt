@@ -8,3 +8,4 @@ libdrm2
 libgbm1
 libxshmfence1
 libx11-xcb1
+playwright
