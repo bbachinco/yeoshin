@@ -7,6 +7,7 @@ import io
 import re
 from dotenv import load_dotenv
 import tempfile
+import subprocess
 
 # Anthropic 관련
 from anthropic import Anthropic
@@ -110,6 +111,10 @@ class YeoshinScraper:
     def setup_driver(self):
         """Playwright 설정"""
         try:
+            # Playwright 설치 명령어 실행
+            subprocess.run(['playwright', 'install'], check=True)
+            subprocess.run(['playwright', 'install-deps'], check=True)
+            
             self.playwright = sync_playwright().start()
             
             browser_options = {
@@ -276,7 +281,7 @@ class YeoshinScraper:
                 try:
                     element = self.page.wait_for_selector(selector, timeout=5000)
                     event_data['hospital_name'] = element.text.strip()
-                    self.logger.info(f"병원명 추출 성공: {event_data['hospital_name']}")
+                    self.logger.info(f"병원명 ���출 성공: {event_data['hospital_name']}")
                     break
                 except Exception as e:
                     self.logger.debug(f"병원명 선택자 {selector} 실패: {str(e)}")
@@ -349,7 +354,7 @@ class YeoshinScraper:
 
                 # 버튼 클릭 시도
                 purchase_button_clicked = False
-                if len(buttons) == 1:  # 버튼이 하나만 있는 경우
+                if len(buttons) == 1:  # ��튼이 하나만 있는 경우
                     try:
                         self.page.evaluate("arguments[0].click();", buttons[0])
                         self.logger.info("단일 구매하기 버튼 클릭 성공")
@@ -384,7 +389,7 @@ class YeoshinScraper:
                         option_selector = f"{options_container_selector}/div[{idx}]"
                         option_element = self.page.wait_for_selector(option_selector, timeout=5000)
                         
-                        # 옵션명 추출
+                        # 옵���명 추출
                         option_name = option_element.query_selector("div > p").text.strip()
                         
                         # 가격 추출
@@ -446,7 +451,7 @@ class YeoshinScraper:
                 try:
                     container = self.page.wait_for_selector(selector, timeout=10000)
                     if container:
-                        self.logger.info("검색 결과 리스트 컨테이너 찾기 성공")
+                        self.logger.info("��색 결과 리스트 컨테이너 찾기 성공")
                         break
                 except:
                     continue
@@ -604,7 +609,7 @@ def analyze_with_claude(df):
         1. 고객 반응 상세 분석
         
         분석 시 다음 가이드라인을 준수해주세요:
-        1. 실제 예시와 수치를 근로 들어 분석해주세요.
+        1. 실제 예시와 수���를 근로 들어 분석해주세요.
         2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
         3. 분석할 때 주의사항:
             - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
