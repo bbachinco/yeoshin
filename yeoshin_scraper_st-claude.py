@@ -399,8 +399,31 @@ class YeoshinScraper:
                     self.logger.error("구매하기 버튼 클릭 실패")
                     return [event_data]
 
-                # 모달창이 열리기를 명시적으로 기다림
-                self.page.wait_for_selector('//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]', timeout=5000)
+                # 잠시 대기 후 모달창 확인
+                self.page.wait_for_timeout(2000)  # 2초 대기
+                
+                # 여러 가능한 모달창 선택자 시도
+                modal_selectors = [
+                    '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
+                    '//*[@id="ct-view"]/div/div/div[2]',  # 상위 요소
+                    '//div[contains(@class, "modal") or contains(@class, "popup")]'  # 일반적인 모달 클래스
+                ]
+                
+                modal_found = False
+                for selector in modal_selectors:
+                    try:
+                        self.page.wait_for_selector(selector, timeout=10000)  # 타임아웃 증가
+                        self.logger.info(f"모달창 찾기 성공 - 선택자: {selector}")
+                        modal_found = True
+                        break
+                    except Exception as e:
+                        self.logger.debug(f"모달창 선택자 {selector} 실패")
+                        continue
+                
+                if not modal_found:
+                    self.logger.error("모달창을 찾을 수 없습니다")
+                    return [event_data]
+
                 self.logger.info("모달창 로딩 완료")
 
                 # 옵션 리스트 컨테이너 찾기
