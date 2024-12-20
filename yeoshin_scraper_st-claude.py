@@ -430,18 +430,19 @@ class YeoshinScraper:
                 try:
                     # 옵션 컨테이너 찾기
                     option_container_selectors = [
-                        "//div[contains(@class, 'modal') or contains(@class, 'popup')]//div[contains(@class, 'option')]",
-                        "//div[contains(@class, 'modal') or contains(@class, 'popup')]//div[contains(@class, 'list')]",
                         '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
-                        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]',
-                        '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0'
+                        '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0 > div.flex.flex-col.w-[100%].overflow-y-scroll.bg-[#ffffff]',
+                        "//div[contains(@class, 'overflow-y-scroll')]",
+                        "//div[contains(@class, 'flex-col')][contains(@class, 'bg-[#ffffff]')]"
                     ]
 
                     container_found = False
                     for selector in option_container_selectors:
                         try:
                             options_container = self.page.locator(selector)
-                            if options_container.count() > 0:
+                            count = options_container.count()
+                            self.logger.info(f"선택자 {selector} 시도 - 요소 수: {count}")
+                            if count > 0:
                                 self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
                                 container_found = True
                                 break
