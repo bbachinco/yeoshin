@@ -22,7 +22,7 @@ openpyxl==3.1.2
 packaging>=16.8,<24
 pandas>=2.1.0
 plotly<5.18
-pillow==11.0.0
+pillow>=9.0.0,<11
 playwright==1.41.2
 protobuf==5.29.2
 pyarrow==18.1.0
