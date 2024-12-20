@@ -24,7 +24,7 @@ pandas>=2.1.0
 plotly<5.18
 pillow>=9.0.0,<11
 playwright==1.41.2
-protobuf==5.29.2
+protobuf>=3.20,<5
 pyarrow==18.1.0
 pydantic_core==2.27.2
 pyee==11.0.1
