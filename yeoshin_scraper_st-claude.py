@@ -361,7 +361,78 @@ class YeoshinScraper:
 
             # 옵션 정보 추출 로직은 그대로 유지...
             
-            return [event_data]
+            # 옵션 정보 추출
+            self.logger.info("옵션 정보 추출 시도...")
+            options_data = []  # 옵션 정보를 저장할 리스트
+
+            try:
+                # 구매하기 버튼이 있는 섹션 찾기
+                section_selector = '//*[@id="ct-view"]/div/div/section'
+                section = self.page.locator(section_selector)
+                self.logger.info("구매하기 버튼 섹션 찾기 성공")
+
+                # 섹션 내의 모든 버튼 찾기
+                buttons = section.locator("button").all()
+                button_count = len(buttons)
+                self.logger.info(f"발견된 버튼 수: {button_count}")
+
+                # 버튼 클릭 시도
+                purchase_button_clicked = False
+                
+                if button_count == 1:
+                    try:
+                        # JavaScript를 통한 클릭
+                        self.page.evaluate("buttons => buttons[0].click()", buttons)
+                        self.logger.info("단일 구매하기 버튼 클릭 성공")
+                        purchase_button_clicked = True
+                    except Exception as e:
+                        self.logger.error(f"단일 구매하기 버튼 클릭 실패: {str(e)}")
+                
+                elif button_count >= 2:
+                    try:
+                        # JavaScript를 통한 클릭
+                        self.page.evaluate("buttons => buttons[1].click()", buttons)
+                        self.logger.info("두 번째 구매하기 버튼 클릭 성공")
+                        purchase_button_clicked = True
+                    except Exception as e:
+                        self.logger.error(f"두 번째 구매하기 버튼 클릭 실패: {str(e)}")
+
+                if not purchase_button_clicked:
+                    self.logger.error("구매하기 버튼 클릭 실패")
+                    return [event_data]
+
+                # 모달창이 열리기를 명시적으로 기다림
+                self.page.wait_for_selector('//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]', timeout=5000)
+                self.logger.info("모달창 로딩 완료")
+
+                # 옵션 리스트 컨테이너 찾기
+                options_container_selector = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]'
+                options_container = self.page.locator(options_container_selector)
+                
+                # 개별 옵션들 찾기
+                option_elements = options_container.locator("div").all()
+                
+                for idx, option in enumerate(option_elements, 1):
+                    try:
+                        option_name = option.locator("div > p").text_content().strip()
+                        price = option.locator("p").text_content().strip()
+                        
+                        option_data = event_data.copy()
+                        option_data['option_name'] = option_name
+                        option_data['price'] = price
+                        options_data.append(option_data)
+                        
+                        self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+                        
+                    except Exception as e:
+                        self.logger.error(f"옵션 {idx} 추출 중 오류 발생: {str(e)}")
+                        continue
+
+                return options_data if options_data else [event_data]
+
+            except Exception as e:
+                self.logger.error(f"옵션 정보 처리 실패: {str(e)}")
+                return [event_data]
 
         except Exception as e:
             self.logger.error(f"이벤트 상세 정보 추출 중 오류: {str(e)}")
@@ -420,7 +491,7 @@ class YeoshinScraper:
             # 모든 이벤트의 데이터를 저장할 리스트
             all_events_data = []
             
-            # 각 이벤트마다 상세 정보 ���집
+            # 각 이벤트마다 상세 정보 수집
             for idx in range(1, total_items + 1):
                 try:
                     self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{total_items}) ===")
