@@ -1,15 +1,5 @@
-libnss3
-libatk-bridge2.0-0
-libxcomposite1
-libxrandr2
-libxdamage1
-libasound2
-libdrm2
-libgbm1
-libxshmfence1
-libx11-xcb1
 wget
-nzip
+unip
 ontconfig
 ocales
 ibasound2
