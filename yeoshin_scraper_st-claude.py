@@ -234,48 +234,19 @@ class YeoshinScraper:
                     element = self.page.locator(selector).first
                     if element:
                         event_name = element.text_content().strip()
-                        self.logger.info(f"이벤트명 추출 성공: {event_name}")
+                        self.logger.info(f"이벤트명 추출 성공 - 선택자: {selector}, 값: {event_name}")
                         break
                 except Exception as e:
+                    self.logger.info(f"이벤트명 추출 실패 - 선택자: {selector}, 오류: {str(e)}")
                     continue
             
-            # 병원명 추출
+            # 병원명 추출 (임시로 비워둠)
             self.logger.info("병원명 추출 시도...")
-            hospital_selectors = [
-                "div.sc-509fd85f-0 p",  # CSS 선택자
-                "//div[contains(@class, 'sc-509fd85f-0')]//p",  # XPath
-                "article div p"  # 간단한 CSS 선택자
-            ]
+            hospital_name = "정보 없음"
             
-            hospital_name = None
-            for selector in hospital_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        hospital_name = element.text_content().strip()
-                        self.logger.info(f"병원명 추출 성공: {hospital_name}")
-                        break
-                except Exception as e:
-                    continue
-            
-            # 위치 정보 추출
+            # 위치 정보 추출 (임시로 비워둠)
             self.logger.info("위치 정보 추출 시도...")
-            location_selectors = [
-                "div.sc-509fd85f-0 span",  # CSS 선택자
-                "//div[contains(@class, 'sc-509fd85f-0')]//span",  # XPath
-                "article div span"  # 간단한 CSS 선택자
-            ]
-            
-            location = None
-            for selector in location_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        location = element.text_content().strip()
-                        self.logger.info(f"위치 정보 추출 성공: {location}")
-                        break
-                except Exception as e:
-                    continue
+            location = "위치 정보 없음"
             
             # 옵션 정보 추출
             self.logger.info("옵션 정보 추출 시도...")
