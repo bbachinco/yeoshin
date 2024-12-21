@@ -870,23 +870,37 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
         return None
 
-def find_option_container(driver):
-    logger.info("모달 내부 HTML 구조:")
-    modal = driver.find_element(By.XPATH, '//div[contains(@class, "modal") or contains(@class, "popup")]')
-    logger.info(modal.get_attribute('outerHTML'))  # 모달의 전체 HTML 구조 출력
+async def find_option_container(page):
+    # 모달 찾기
+    modal = await page.wait_for_selector('div[class*="modal"], div[class*="popup"]')
+    logger.info("모달 HTML 구조 확인:")
+    modal_html = await modal.inner_html()
+    logger.info(modal_html)
 
-    # 모달 내부의 모든 div 요소 찾기
-    all_divs = modal.find_elements(By.TAG_NAME, 'div')
+    selectors = [
+        '#ct-view div div div[class*="fixed"] div div div div[class*="overflow-auto"] div[class*="flex-col"]',
+        'div[class*="flex-col"][class*="overflow-y-scroll"]',
+        'div[class*="overflow-auto"] div[class*="flex-col"]',
+        'div[class*="modal"] div[class*="overflow"]',
+        'div[class*="popup"] div[class*="scroll"]',
+        'div[class*="modal"] div[class*="options"]'
+    ]
+
+    for selector in selectors:
+        try:
+            elements = await page.query_selector_all(selector)
+            logger.info(f"선택자 {selector} 시도 - 요소 수: {len(elements)}")
+            if elements:
+                return elements[0]
+        except Exception as e:
+            logger.info(f"선택자 {selector} 시도 실패: {str(e)}")
+            continue
+
+    # 모달 내의 모든 div 요소 수 확인
+    all_divs = await modal.query_selector_all('div')
     logger.info(f"모달 내부 div 요소 수: {len(all_divs)}")
     
-    # 기존 컨테이너 찾기 로직
-    selectors = [
-        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
-        '#ct-view > div > div > div[class*="fixed"] > div > div > div > div[class*="overflow-auto"] > div[class*="flex-col"]',
-        '//div[contains(@class, "flex-col") and contains(@class, "overflow-y-scroll")]',
-        '//div[contains(@class, "overflow-auto")]//div[contains(@class, "flex-col")]'
-    ]
-    # ... 나머지 코드 ...
+    return None
 
 def main():
     st.title("여신티켓 데이터 스크래퍼")
