@@ -361,71 +361,77 @@ class YeoshinScraper:
 
             # 옵션 정보 추출 로직 수정
             try:
-                # 옵션 컨테이너 선택자 정의
-                container_selectors = {
-                    'xpath': '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]',
-                    'css': '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0'
-                }
+                self.logger.info("옵션 정보 추출 시작...")
                 
-                # 옵션 컨테이너 찾기
-                container = None
-                for selector_type, selector in container_selectors.items():
-                    try:
-                        if selector_type == 'xpath':
-                            container = self.page.locator(f"xpath={selector}")
-                        else:
-                            container = self.page.locator(selector)
-                            
-                        if container.count() > 0:
-                            self.logger.info(f"옵션 컨테이너 찾기 성공 - {selector_type}")
-                            break
-                    except Exception as e:
-                        self.logger.debug(f"옵션 컨테이너 선택자 {selector_type} 실패: {str(e)}")
-                        continue
+                # 옵션 컨테이너 선택자
+                container_selector = '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0'
                 
-                if not container:
-                    self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
+                # 옵션 버튼 클릭 (옵션 모달 열기)
+                try:
+                    option_button = self.page.locator('button:has-text("옵션선택")')
+                    option_button.click()
+                    self.logger.info("옵션 선택 버튼 클릭 성공")
+                    time.sleep(2)  # 모달이 열릴 때까지 대기
+                except Exception as e:
+                    self.logger.error(f"옵션 선택 버튼 클릭 실패: {str(e)}")
                     return [event_data]
 
-                # 개별 옵션 요소 선택자 패턴
-                options_base_xpath = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]/div'
+                # 옵션 컨테이너 대기 및 확인
+                try:
+                    container = self.page.locator(container_selector)
+                    container.wait_for(state="visible", timeout=5000)
+                    self.logger.info("옵션 컨테이너 찾기 성공")
+                except Exception as e:
+                    self.logger.error(f"옵션 컨테이너 찾기 실패: {str(e)}")
+                    return [event_data]
+
+                # 개별 옵션 요소들 찾기
+                options_base_selector = f"{container_selector} > div.flex.flex-col.w-[(100%)].overflow-y-scroll.bg-[#ffffff] > div"
                 
-                # 개별 옵션 정보 추출
                 options_data = []
                 idx = 1
                 while True:
                     try:
                         # 각 옵션 요소 찾기
-                        option_xpath = f"{options_base_xpath}[{idx}]"
-                        option = self.page.locator(f"xpath={option_xpath}")
+                        option_selector = f"{options_base_selector}:nth-child({idx})"
+                        option = self.page.locator(option_selector)
                         
-                        if not option or option.count() == 0:
+                        if not option.count():
+                            self.logger.info(f"더 이상의 옵션이 없습니다. 총 {idx-1}개의 옵션을 찾았습니다.")
                             break
                         
-                        # 옵션명과 가격 추출
+                        # 옵션 텍스트 내용 가져오기
                         option_text = option.text_content()
-                        if not option_text:
-                            break
-                            
-                        # 옵션 정보 파싱
-                        lines = option_text.strip().split('\n')
-                        if len(lines) >= 2:
-                            option_name = lines[0].strip()
-                            price = lines[-1].strip()
-                            
-                            option_data = event_data.copy()
-                            option_data['option_name'] = option_name
-                            option_data['price'] = price
-                            options_data.append(option_data)
-                            
-                            self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+                        self.logger.info(f"옵션 {idx} 원본 텍스트: {option_text}")
+                        
+                        if option_text:
+                            # 옵션명과 가격 분리
+                            lines = [line.strip() for line in option_text.split('\n') if line.strip()]
+                            if len(lines) >= 2:
+                                option_name = lines[0]
+                                price = lines[-1]
+                                
+                                option_data = event_data.copy()
+                                option_data['option_name'] = option_name
+                                option_data['price'] = price
+                                options_data.append(option_data)
+                                
+                                self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
                         
                         idx += 1
                         
                     except Exception as e:
-                        self.logger.error(f"옵션 {idx} 추출 실패: {str(e)}")
+                        self.logger.error(f"옵션 {idx} 처리 중 오류: {str(e)}")
                         break
                 
+                # 옵션 모달 닫기
+                try:
+                    close_button = self.page.locator('button[aria-label="Close"]')
+                    close_button.click()
+                    self.logger.info("옵션 모달 닫기 성공")
+                except Exception as e:
+                    self.logger.error(f"옵션 모달 닫기 실패: {str(e)}")
+
                 if not options_data:
                     self.logger.warning("추출된 옵션 정보가 없습니다")
                     return [event_data]
@@ -433,7 +439,7 @@ class YeoshinScraper:
                 return options_data
 
             except Exception as e:
-                self.logger.error(f"옵션 정보 처리 실패: {str(e)}")
+                self.logger.error(f"옵션 정보 처리 중 오류 발생: {str(e)}")
                 return [event_data]
 
         except Exception as e:
