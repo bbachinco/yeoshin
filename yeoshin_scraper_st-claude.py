@@ -653,114 +653,147 @@ def validate_data(df):
 
 def analyze_with_claude(df):
     try:
-        st.write("Claude API 키 확인:", os.getenv("CLAUDE_API_KEY")[:10] + "...")
-        anthropic = Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
-        st.write("Anthropic 객체 생성 완료")   
-             
-        # 데이터 전처리
-        analysis_data = df.copy()
-        analysis_data['exposure_order'] = analysis_data.index + 1
+        # 1. API 키 확인
+        api_key = os.getenv("CLAUDE_API_KEY")
+        st.write("1. API 키 상태:", "있음" if api_key else "없음")
         
-        prompt = f"""
-        여신티켓의 시술 이벤트 데이터를 분석하여, 새로운 이벤트를 등록하려는 원에 도움이 될 만한 인사이트를 제공해주세요.
-        
-        아래 형식에 맞춰 분석해주세요:
-        
-        A. 옵션 분석
-        1. 옵션 패턴 분석
-        2. 가격대별 옵션 구성 특징
-        3. 평균 옵션 개수 분석
-        
-        B. 첫 번째 옵션 분석
-        1. 일반적인 첫 번째 옵션 패턴
-        2. 가격 비교
-        
-        C. 위치 기반 분석
-        1. 지역별 특성
-        
-        D. 고객 반응 분석
-        1. 고객 반응 상세 분석
-        
-        분석 시 다음 가이드라인을 준수해주세요:
-        1. 실제 예시와 수를 근로 들어 분석해주세요.
-        2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
-        3. 분석할 때 주의사항:
-            - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
-        
-        마지막으로, 3지 핵심 제언 해주세요.
-        
-        데이터:
-        {analysis_data.to_string()}
-        """
-        
-        response = anthropic.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2500,
-            temperature=0,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        # 응답 처리 수정
-        if not response:
-            st.error("Claude AI로부터 응답을 받지 못했습니다.")
-            return "분석을 수행할 수 없습니다."
-        
+        # 2. Anthropic 객체 생성
         try:
-            # content 속성에 직접 접근
+            anthropic = Anthropic(api_key=api_key)
+            st.write("2. Anthropic 객체 생성 성공")
+        except Exception as e:
+            st.error(f"2. Anthropic 객체 생성 실패: {str(e)}")
+            return "Anthropic 객체 생성 실패"
+
+        # 3. 데이터 전처리 확인
+        try:
+            analysis_data = df.copy()
+            analysis_data['exposure_order'] = analysis_data.index + 1
+            st.write("3. 데이터 전처리 성공")
+            st.write("데이터 샘플:", analysis_data.head(1).to_dict())
+        except Exception as e:
+            st.error(f"3. 데이터 전처리 실패: {str(e)}")
+            return "데이터 전처리 실패"
+
+        # 4. 프롬프트 생성
+        try:
+            prompt = f"""
+            여신티켓의 시술 이벤트 데이터를 분석하여, 새로운 이벤트를 등록하려는 원에 도움이 될 만한 인사이트를 제공해주세요.
+            
+            아래 형식에 맞춰 분석해주세요:
+            
+            A. 옵션 분석
+            1. 옵션 패턴 분석
+            2. 가격대별 옵션 구성 특징
+            3. 평균 옵션 개수 분석
+            
+            B. 첫 번째 옵션 분석
+            1. 일반적인 첫 번째 옵션 패턴
+            2. 가격 비교
+            
+            C. 위치 기반 분석
+            1. 지역별 특성
+            
+            D. 고객 반응 분석
+            1. 고객 반응 상세 분석
+            
+            분석 시 다음 가이드라인을 준수해주세요:
+            1. 실제 예시와 수치를 들어 분석해주세요.
+            2. 가격에 대한 분석을 할 때에는 정확한 금액과 실제 예시를 들어서 설명해주세요.
+            3. 분석할 때 주의사항:
+                - 가격이나 용량의 범위를 표현할 때는 '~' 대신 '부터', '까지' 또는 '-' 를 사용해주세요.
+            
+            마지막으로, 3가지 핵심 제언을 해주세요.
+            
+            데이터:
+            {analysis_data.to_string()}
+            """
+            st.write("4. 프롬프트 생성 성공")
+        except Exception as e:
+            st.error(f"4. 프롬프트 생성 실패: {str(e)}")
+            return "프롬프트 생성 실패"
+
+        # 5. API 호출
+        try:
+            response = anthropic.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2500,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            st.write("5. API 호출 성공")
+            st.write("응답 타입:", type(response))
+            st.write("응답 내용 타입:", type(response.content))
+        except Exception as e:
+            st.error(f"5. API 호출 실패: {str(e)}")
+            return "API 호출 실패"
+
+        # 6. 응답 처리
+        try:
+            if not response:
+                st.error("6-1. 응답이 비어있습니다")
+                return "응답이 비어있습니다"
+
             content = response.content
-            if isinstance(content, list) and content:
-                content = content[0].text
+            st.write("6-2. content 타입:", type(content))
+            
+            if isinstance(content, list):
+                st.write("6-3. content는 리스트입니다")
+                if content:
+                    content = content[0].text
+                    st.write("6-4. 첫 번째 요소의 text를 추출했습니다")
             elif hasattr(content, 'text'):
                 content = content.text
+                st.write("6-5. content.text를 추출했습니다")
             else:
                 content = str(content)
-                
+                st.write("6-6. content를 문자열로 변환했습니다")
+
             if not content:
-                st.error("분석 결과가 비어있습니다.")
-                return "분석 결과를 생성할 수 없습니다."
-                
+                st.error("6-7. 최종 content가 비어있습니다")
+                return "분석 결과가 비어있습니다"
+
+            st.write("6-8. 응답 처리 성공")
         except Exception as e:
-            st.error(f"응답 처리 중 오류 발생: {str(e)}")
-            return "응답 처리 중 오류가 발생했습니다."
-        
-        # 섹션 처리 및 표시
-        st.header("🔍 AI 분석 결과")
-        
-        sections = {
-            "A": "옵션 분석 📊",
-            "B": "첫 번째 옵션 분석 💰",
-            "C": "위치 기반 분석 📍",
-            "D": "고객 반응 분석 👥"
-        }
-        
-        for section, title in sections.items():
-            st.subheader(f"{title}")
-            section_start = content.find(f"{section}.")
-            if section_start != -1:
-                if section == "D":
-                    section_end = content.find("마지막으로")
-                else:
-                    next_section = chr(ord(section) + 1)
-                    section_end = content.find(f"{next_section}.")
-                
-                if section_end == -1:
-                    section_end = len(content)
+            st.error(f"6. 응답 처리 실패: {str(e)}")
+            return "응답 처리 실패"
+
+        # 7. 결과 표시
+        try:
+            st.header("🔍 AI 분석 결과")
+            
+            sections = {
+                "A": "옵션 분석 📊",
+                "B": "첫 번째 옵션 분석 💰",
+                "C": "위치 기반 분석 📍",
+                "D": "고객 반응 분석 👥"
+            }
+            
+            for section, title in sections.items():
+                st.subheader(f"{title}")
+                section_start = content.find(f"{section}.")
+                if section_start != -1:
+                    if section == "D":
+                        section_end = content.find("마지막으로")
+                    else:
+                        next_section = chr(ord(section) + 1)
+                        section_end = content.find(f"{next_section}.")
                     
-                section_content = content[section_start:section_end].strip()
-                st.markdown(section_content)
-        
-        # 핵심 제언 표시
-        if "핵심 제언" in content:
-            st.subheader("💡 새로운 이벤트 등록을 위한 핵심 제언")
-            recommendations = content[content.find("핵심 제언"):].split("\n")
-            for rec in recommendations[1:]:
-                if rec.strip():
-                    st.info(rec.strip())
-        
+                    if section_end == -1:
+                        section_end = len(content)
+                        
+                    section_content = content[section_start:section_end].strip()
+                    st.markdown(section_content)
+            
+            st.write("7. 섹션 표시 성공")
+        except Exception as e:
+            st.error(f"7. 섹션 표시 실패: {str(e)}")
+            return "섹션 표시 실패"
+
         return content
             
     except Exception as e:
-        st.error(f"Claude AI 분석 중 오류가 발생했습니다: {str(e)}")
+        st.error(f"전체 프로세스 실패: {str(e)}")
         return "분석을 수행할 수 없습니다."
 
 
