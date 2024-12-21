@@ -461,23 +461,27 @@ class YeoshinScraper:
                             if not option:
                                 break
                                 
-                            # 옵션명과 가격 추출
-                            option_name = option.evaluate('''(element) => {
-                                const nameElement = element.querySelector("p:first-child");
-                                return nameElement ? nameElement.textContent.trim() : null;
-                            }''')
+                            # 옵션명과 가격 추출 (정확한 XPath 사용)
+                            try:
+                                option_name_xpath = f'//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]/div[{idx}]/div/p'
+                                price_xpath = f'//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]/div[{idx}]/p'
+                                
+                                option_name_element = self.page.wait_for_selector(option_name_xpath, timeout=5000)
+                                price_element = self.page.wait_for_selector(price_xpath, timeout=5000)
+                                
+                                if option_name_element and price_element:
+                                    option_name = option_name_element.text_content().strip()
+                                    price = price_element.text_content().strip()
+                                    
+                                    option_data = event_data.copy()
+                                    option_data['option_name'] = option_name
+                                    option_data['price'] = price
+                                    options_data.append(option_data)
+                                    self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
                             
-                            price = option.evaluate('''(element) => {
-                                const priceElement = element.querySelector("p:last-child");
-                                return priceElement ? priceElement.textContent.trim() : null;
-                            }''')
-                            
-                            if option_name and price:
-                                option_data = event_data.copy()
-                                option_data['option_name'] = option_name
-                                option_data['price'] = price
-                                options_data.append(option_data)
-                                self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+                            except Exception as e:
+                                self.logger.error(f"옵션 {idx} 상세 정보 추출 실패: {str(e)}")
+                                continue
                             
                             idx += 1
                             
