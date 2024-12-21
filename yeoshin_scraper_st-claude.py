@@ -10,7 +10,7 @@ import tempfile
 import subprocess
 
 # Anthropic 관련
-from anthropic import Anthropic
+from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 
 # Playwright 관련
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
@@ -661,13 +661,28 @@ def analyze_with_claude(df):
             st.error(f"API 키를 찾을 수 없습니다: {str(e)}")
             return "API 키 없음"
         
-        # 2. Anthropic 객체 생성 - 환경 변수 설정 후 초기화
+        # 2. Anthropic 객체 생성 - 완전히 새로운 방식으로 시도
         try:
+            # 환경 변수 설정
             os.environ["ANTHROPIC_API_KEY"] = api_key
-            anthropic = Anthropic()
+            
+            # 클라이언트 생성 - 어떤 추가 인자도 없이 생성
+            client = Anthropic()
             st.write("2. Anthropic 객체 생성 성공")
+            
+            # 나머지 코드에서 anthropic 대신 client 사용
+            response = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2500,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
         except Exception as e:
             st.error(f"2. Anthropic 객체 생성 실패: {str(e)}")
+            # 에러의 자세한 내용 출력
+            st.error(f"에러 타입: {type(e)}")
+            st.error(f"에러 내용: {str(e)}")
             return "Anthropic 객체 생성 실패"
 
         # 3. 데이터 전처리 확인
