@@ -49,21 +49,31 @@ class YeoshinScraper:
     
     def cleanup(self):
         """브라우저 정리를 위한 메서드"""
-        if self.page:
-            try:
+        try:
+            if self.page and self.page.is_connected():
                 self.page.close()
-            except Exception as e:
-                self.logger.error(f"페이지 종료 중 오류: {str(e)}")
-        if self.browser:
-            try:
+                self.logger.info("페이지가 성공적으로 종료되었습니다.")
+        except Exception as e:
+            self.logger.error(f"페이지 종료 중 오류: {str(e)}")
+        
+        try:
+            if self.browser and not self.browser.is_closed():
                 self.browser.close()
-            except Exception as e:
-                self.logger.error(f"브라우저 종료 중 오류: {str(e)}")
-        if self.playwright:
-            try:
+                self.logger.info("브라우저가 성공적으로 종료되었습니다.")
+        except Exception as e:
+            self.logger.error(f"브라우저 종료 중 오류: {str(e)}")
+        
+        try:
+            if self.playwright:
                 self.playwright.stop()
-            except Exception as e:
-                self.logger.error(f"Playwright 종료 중 오류: {str(e)}")
+                self.logger.info("Playwright가 성공적으로 종료되었습니다.")
+        except Exception as e:
+            self.logger.error(f"Playwright 종료 중 오류: {str(e)}")
+        
+        # 모든 참조 초기화
+        self.page = None
+        self.browser = None
+        self.playwright = None
 
     def setup_logging(self):
         """로깅 설정"""
