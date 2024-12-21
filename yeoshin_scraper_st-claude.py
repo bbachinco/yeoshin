@@ -359,87 +359,84 @@ class YeoshinScraper:
                 'price': "가격 정보 없음"
             }
 
-            # 옵션 정보 추출 로직 수정
-            try:
-                self.logger.info("옵션 정보 추출 시작...")
-                
-                # 옵션 컨테이너 선택자
-                container_selector = '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0'
-                
-                # 옵션 버튼 클릭 (옵션 모달 열기)
-                try:
-                    option_button = self.page.locator('button:has-text("옵션선택")')
-                    option_button.click()
-                    self.logger.info("옵션 선택 버튼 클릭 성공")
-                    time.sleep(2)  # 모달이 열릴 때까지 대기
-                except Exception as e:
-                    self.logger.error(f"옵션 선택 버튼 클릭 실패: {str(e)}")
-                    return [event_data]
+            # 옵션 정보 추출 로직은 그대로 유지...
+            
+            # 옵션 정보 추출
+            self.logger.info("옵션 정보 추출 시도...")
+            options_data = []  # 옵션 정보를 저장할 리스트
 
-                # 옵션 컨테이너 대기 및 확인
-                try:
-                    container = self.page.locator(container_selector)
-                    container.wait_for(state="visible", timeout=5000)
-                    self.logger.info("옵션 컨테이너 찾기 성공")
-                except Exception as e:
-                    self.logger.error(f"옵션 컨테이너 찾기 실패: {str(e)}")
+            try:
+                # 옵션 컨테이너 찾기
+                option_container_selectors = [
+                    '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
+                    '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]',
+                    '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0 > div.flex.flex-col.w-[(100%)].overflow-y-scroll.bg-[#ffffff]'
+                ]
+
+                container_found = False
+                for selector in option_container_selectors:
+                    try:
+                        options_container = self.page.locator(selector)
+                        if options_container.count() > 0:
+                            self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
+                            container_found = True
+                            break
+                    except Exception as e:
+                        continue
+
+                if not container_found:
+                    self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
                     return [event_data]
 
                 # 개별 옵션 요소들 찾기
-                options_base_selector = f"{container_selector} > div.flex.flex-col.w-[(100%)].overflow-y-scroll.bg-[#ffffff] > div"
-                
-                options_data = []
-                idx = 1
-                while True:
-                    try:
-                        # 각 옵션 요소 찾기
-                        option_selector = f"{options_base_selector}:nth-child({idx})"
-                        option = self.page.locator(option_selector)
-                        
-                        if not option.count():
-                            self.logger.info(f"더 이상의 옵션이 없습니다. 총 {idx-1}개의 옵션을 찾았습니다.")
-                            break
-                        
-                        # 옵션 텍스트 내용 가져오기
-                        option_text = option.text_content()
-                        self.logger.info(f"옵션 {idx} 원본 텍스트: {option_text}")
-                        
-                        if option_text:
-                            # 옵션명과 가격 분리
-                            lines = [line.strip() for line in option_text.split('\n') if line.strip()]
-                            if len(lines) >= 2:
-                                option_name = lines[0]
-                                price = lines[-1]
-                                
-                                option_data = event_data.copy()
-                                option_data['option_name'] = option_name
-                                option_data['price'] = price
-                                options_data.append(option_data)
-                                
-                                self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
-                        
-                        idx += 1
-                        
-                    except Exception as e:
-                        self.logger.error(f"옵션 {idx} 처리 중 오류: {str(e)}")
-                        break
-                
-                # 옵션 모달 닫기
                 try:
-                    close_button = self.page.locator('button[aria-label="Close"]')
-                    close_button.click()
-                    self.logger.info("옵션 모달 닫기 성공")
+                    options = []
+                    idx = 1
+                    while True:
+                        option_selector = f"{selector}/div[{idx}]"
+                        try:
+                            option = self.page.locator(option_selector)
+                            if option.count() == 0:
+                                break
+                            options.append(option)
+                            idx += 1
+                        except:
+                            break
+
+                    self.logger.info(f"발견된 옵션 수: {len(options)}")
+
+                    for idx, option in enumerate(options, 1):
+                        try:
+                            # 옵션명과 가격 정보가 있는 p 태그들 찾기
+                            p_tags = option.locator("p").all()
+                            
+                            if len(p_tags) >= 2:
+                                option_name = p_tags[0].text_content().strip()
+                                price = p_tags[-1].text_content().strip()
+                                
+                                if option_name and price:
+                                    option_data = event_data.copy()
+                                    option_data['option_name'] = option_name
+                                    option_data['price'] = price
+                                    options_data.append(option_data)
+                                    self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+
+                        except Exception as e:
+                            self.logger.error(f"옵션 {idx} 추출 실패: {str(e)}")
+                            continue
+
                 except Exception as e:
-                    self.logger.error(f"옵션 모달 닫기 실패: {str(e)}")
+                    self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
+                    return [event_data]
 
                 if not options_data:
                     self.logger.warning("추출된 옵션 정보가 없습니다")
                     return [event_data]
-                    
+
                 return options_data
 
             except Exception as e:
-                self.logger.error(f"옵션 정보 처리 중 오류 발생: {str(e)}")
+                self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
                 return [event_data]
 
         except Exception as e:
@@ -800,38 +797,6 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
     except Exception as e:
         st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
         return None
-
-async def find_option_container(page):
-    # 모달 찾기
-    modal = await page.wait_for_selector('div[class*="modal"], div[class*="popup"]')
-    logger.info("모달 HTML 구조 확인:")
-    modal_html = await modal.inner_html()
-    logger.info(modal_html)
-
-    selectors = [
-        '#ct-view div div div[class*="fixed"] div div div div[class*="overflow-auto"] div[class*="flex-col"]',
-        'div[class*="flex-col"][class*="overflow-y-scroll"]',
-        'div[class*="overflow-auto"] div[class*="flex-col"]',
-        'div[class*="modal"] div[class*="overflow"]',
-        'div[class*="popup"] div[class*="scroll"]',
-        'div[class*="modal"] div[class*="options"]'
-    ]
-
-    for selector in selectors:
-        try:
-            elements = await page.query_selector_all(selector)
-            logger.info(f"선택자 {selector} 시도 - 요소 수: {len(elements)}")
-            if elements:
-                return elements[0]
-        except Exception as e:
-            logger.info(f"선택자 {selector} 시도 실패: {str(e)}")
-            continue
-
-    # 모달 내의 모든 div 요소 수 확인
-    all_divs = await modal.query_selector_all('div')
-    logger.info(f"모달 내부 div 요소 수: {len(all_divs)}")
-    
-    return None
 
 def main():
     st.title("여신티켓 데이터 스크래퍼")
