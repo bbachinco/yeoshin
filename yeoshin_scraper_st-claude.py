@@ -262,41 +262,26 @@ class YeoshinScraper:
                 except Exception as e:
                     continue
 
-            # 평점 추출
-            self.logger.info("평점 추출 시도...")
-            rating_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/div/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > div > span'
-            ]
-            
-            rating = None
-            for selector in rating_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        rating = element.text_content().strip()
-                        self.logger.info(f"평점 추출 성공 - 값: {rating}")
-                        break
-                except Exception as e:
-                    continue
-
-            # 리뷰 수 추출
-            self.logger.info("리뷰 수 추출 시도...")
-            review_count_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > span'
-            ]
-            
-            review_count = None
-            for selector in review_count_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        review_count = element.text_content().strip()
-                        self.logger.info(f"리뷰 수 추출 성공 - 값: {review_count}")
-                        break
-                except Exception as e:
-                    continue
+            # 평점과 리뷰수 추출
+            try:
+                # 평점과 리뷰수가 있는 컨테이너 먼저 찾기
+                rating_container_xpath = '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div'
+                container = self.page.wait_for_selector(rating_container_xpath, timeout=5000)
+                
+                if container:
+                    # 컨테이너 내에서 평점과 리뷰수 추출
+                    rating = self.page.wait_for_selector(f"{rating_container_xpath}/div/span", timeout=2000)
+                    review_count = self.page.wait_for_selector(f"{rating_container_xpath}/span", timeout=2000)
+                    
+                    if rating and review_count:
+                        rating = rating.text_content().strip()
+                        review_count = review_count.text_content().strip()
+                        self.logger.info(f"평점: {rating}, 리뷰수: {review_count}")
+                    
+            except Exception as e:
+                self.logger.error(f"평점/리뷰수 추출 실패: {str(e)}")
+                rating = "N/A"
+                review_count = "N/A"
 
             # 병원명 추출
             self.logger.info("병원명 추출 시도...")
