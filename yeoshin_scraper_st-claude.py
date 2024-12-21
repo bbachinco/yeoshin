@@ -661,18 +661,14 @@ def analyze_with_claude(df):
             st.error(f"API 키를 찾을 수 없습니다: {str(e)}")
             return "API 키 없음"
         
-        # 2. Anthropic 객체 생성 - 가장 기본적인 형태로 초기화
+        # 2. Anthropic 객체 생성 - 환경 변수 설정 후 초기화
         try:
-            anthropic = Anthropic()  # API 키는 환경 변수에서 자동으로 가져옴
+            os.environ["ANTHROPIC_API_KEY"] = api_key
+            anthropic = Anthropic()
             st.write("2. Anthropic 객체 생성 성공")
         except Exception as e:
-            # 환경 변수에서 가져오기 실패한 경우 직접 API 키 전달
-            try:
-                anthropic = Anthropic(api_key=api_key)
-                st.write("2. Anthropic 객체 생성 성공 (API 키 직접 전달)")
-            except Exception as e2:
-                st.error(f"2. Anthropic 객체 생성 최종 실패: {str(e2)}")
-                return "Anthropic 객체 생성 실패"
+            st.error(f"2. Anthropic 객체 생성 실패: {str(e)}")
+            return "Anthropic 객체 생성 실패"
 
         # 3. 데이터 전처리 확인
         try:
