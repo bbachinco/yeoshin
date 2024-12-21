@@ -462,15 +462,15 @@ class YeoshinScraper:
                                 break
                                 
                             # 옵션명과 가격 추출
-                            option_name = option.evaluate('(element) => {
+                            option_name = option.evaluate('''(element) => {
                                 const nameElement = element.querySelector("p:first-child");
                                 return nameElement ? nameElement.textContent.trim() : null;
-                            }')
+                            }''')
                             
-                            price = option.evaluate('(element) => {
+                            price = option.evaluate('''(element) => {
                                 const priceElement = element.querySelector("p:last-child");
                                 return priceElement ? priceElement.textContent.trim() : null;
-                            }')
+                            }''')
                             
                             if option_name and price:
                                 option_data = event_data.copy()
