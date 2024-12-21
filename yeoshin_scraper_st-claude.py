@@ -111,6 +111,11 @@ class YeoshinScraper:
     def setup_driver(self):
         """Playwright 설정"""
         try:
+            # 사용 가능한 secrets 키 확인
+            self.logger.info("Available secrets keys:")
+            for key in st.secrets:
+                self.logger.info(f"- {key}")
+            
             # Playwright 브라우저만 설치 (의존성 설치 제외)
             subprocess.run(['playwright', 'install', 'chromium'], check=True)
             
@@ -136,14 +141,18 @@ class YeoshinScraper:
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
             )
             
-            # 쿠키 설정 전에 필수 쿠키 값들이 있는지 확인
-            required_cookies = {
-                '_kau': st.secrets["_kau"],
-                '_kahai': st.secrets["_kahai"],
-                '_karmt': st.secrets["_karmt"],
-                '_kawlt': st.secrets["_kawlt"],
-                'access_token': st.secrets["ACCESS_TOKEN"]
-            }
+            # secrets에서 쿠키 값 가져오기 시도
+            try:
+                required_cookies = {
+                    '_kau': st.secrets["KAU"],  # 대문자로 시도
+                    '_kahai': st.secrets["KAHAI"],
+                    '_karmt': st.secrets["KARMT"],
+                    '_kawlt': st.secrets["KAWLT"],
+                    'access_token': st.secrets["ACCESS_TOKEN"]
+                }
+            except Exception as e:
+                self.logger.error(f"Secrets 접근 오류: {str(e)}")
+                raise Exception("필수 쿠키 값을 secrets에서 찾을 수 없습니다.")
             
             # 필수 쿠키 중 하나라도 없으면 에러 발생
             missing_cookies = [name for name, value in required_cookies.items() if not value]
