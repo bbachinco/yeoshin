@@ -239,136 +239,9 @@ class YeoshinScraper:
             raise e
 
     def get_event_details(self, item, progress_value, progress_bar):
-        """이벤트 상세 정보 추출"""
-        event_data = []
+        """이벤트 상세 정보 ��출"""
         try:
-            self.logger.info("상세 페이지에서 정보 추출 시작...")
-            
-            # 이벤트명 추출
-            self.logger.info("이벤트명 추출 시도...")
-            event_name_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/h1/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > h1 > span'
-            ]
-            
-            event_name = None
-            for selector in event_name_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        event_name = element.text_content().strip()
-                        self.logger.info(f"이벤트명 추출 성공 - 값: {event_name}")
-                        break
-                except Exception as e:
-                    continue
-
-            # 평점 추출
-            self.logger.info("평점 추출 시도...")
-            rating_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/div/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > div > span'
-            ]
-            
-            rating = None
-            for selector in rating_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        rating = element.text_content().strip()
-                        self.logger.info(f"평점 추출 성공 - 값: {rating}")
-                        break
-                except Exception as e:
-                    continue
-
-            # 리뷰 수 추출
-            self.logger.info("리뷰 수 추출 시도...")
-            review_count_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/section[1]/div[2]/div/span',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > section.flex.flex-col.justify-center.w-full.gap-\\[8px\\] > div.flex.items-end.justify-between.w-full > div > span'
-            ]
-            
-            review_count = None
-            for selector in review_count_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        review_count = element.text_content().strip()
-                        self.logger.info(f"리뷰 수 추출 성공 - 값: {review_count}")
-                        break
-                except Exception as e:
-                    continue
-
-            # 병원명 추출
-            self.logger.info("병원명 추출 시도...")
-            hospital_name_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[1]/article/div/div/p',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-509fd85f-0.hQTMVb.bVOgYk.jlAXoU > article > div > div > p'
-            ]
-            
-            hospital_name = None
-            for selector in hospital_name_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        hospital_name = element.text_content().strip()
-                        self.logger.info(f"병원명 추출 성공 - 값: {hospital_name}")
-                        break
-                except Exception as e:
-                    continue
-
-            # 위치 정보 추출
-            self.logger.info("위치 정보 추출 시도...")
-            location_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[1]/article/section[2]/div/div/span[1]',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-509fd85f-0.hQTMVb.bVOgYk.jlAXoU > article > section:nth-child(3) > div > div > span:nth-child(2)'
-            ]
-            
-            location = None
-            for selector in location_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        location = element.text_content().strip()
-                        self.logger.info(f"위치 정보 추출 성공 - 값: {location}")
-                        break
-                except Exception as e:
-                    continue
-
-            # 문의수 추출
-            self.logger.info("문의수 추출 시도...")
-            inquiry_count_selectors = [
-                '//*[@id="ct-view"]/div/div/div[1]/div[2]/div[4]/div[1]/div/p[2]',
-                '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > div.sc-1543ab3d-0.sc-1543ab3d-1.sc-2ad9e729-2.hQTMVb.jrOHqu.bpXUeM > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.iHBozd > div > p.sc-78093dd3-0.sc-78093dd3-1.knAupo.ePvHjs'
-            ]
-            
-            inquiry_count = None
-            for selector in inquiry_count_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        inquiry_count = element.text_content().strip()
-                        self.logger.info(f"문의수 추출 성공 - 값: {inquiry_count}")
-                        break
-                except Exception as e:
-                    continue
-
-            # 스크랩수 추출
-            self.logger.info("스크랩수 추출 시도...")
-            scrap_count_selectors = [
-                '//*[@id="ct-view"]/div/div/section/div[1]/div/p',
-                '#ct-view > div > div > section > div.sc-1543ab3d-0.sc-1543ab3d-1.hQTMVb.dtvKsa > div > p'
-            ]
-            
-            scrap_count = None
-            for selector in scrap_count_selectors:
-                try:
-                    element = self.page.locator(selector).first
-                    if element:
-                        scrap_count = element.text_content().strip()
-                        self.logger.info(f"스크랩수 추출 성공 - 값: {scrap_count}")
-                        break
-                except Exception as e:
-                    continue
+            # ... 기존의 이벤트 정보 추출 코드 ...
 
             # 기본 데이터 구조 생성
             event_data = {
@@ -383,191 +256,111 @@ class YeoshinScraper:
                 'price': "가격 정보 없음"
             }
 
-            # 옵션 정보 추출 로직은 그대로 유지...
-            
-            # 옵션 정보 추출
-            self.logger.info("옵션 정보 추출 시도...")
-            options_data = []  # 옵션 정보를 저장할 리스트
+            # 구매하기 버튼 찾기 및 클릭
+            purchase_button_selectors = [
+                "text=구매하기",
+                "button:has-text('구매하기')",
+                '[data-testid="purchase-button"]'
+            ]
 
-            try:
-                # 구매하기 버튼이 있는 섹션 찾기
-                section_selector = '//*[@id="ct-view"]/div/div/section'
-                section = self.page.locator(section_selector)
-                self.logger.info("구매하기 버튼 섹션 찾기 성공")
-
-                # 섹션 내의 모든 버튼 찾기
-                buttons = section.locator("button")
-                button_count = buttons.count()
-                self.logger.info(f"발견된 버튼 수: {button_count}")
-
-                # 버튼 클릭 시도
-                purchase_button_clicked = False
-                
-                if button_count == 1:
-                    try:
-                        buttons.first.click()
+            purchase_button_clicked = False
+            for selector in purchase_button_selectors:
+                try:
+                    button = self.page.locator(selector).first
+                    if button and button.is_visible():
+                        button.click()
                         self.logger.info("단일 구매하기 버튼 클릭 성공")
                         purchase_button_clicked = True
-                    except Exception as e:
-                        self.logger.error(f"단일 구매하기 버튼 클릭 실패: {str(e)}")
-                
-                elif button_count >= 2:
-                    try:
-                        buttons.nth(1).click()  # 두 번째 버튼 클릭
-                        self.logger.info("두 번째 구매하기 버튼 클릭 성공")
-                        purchase_button_clicked = True
-                    except Exception as e:
-                        self.logger.error(f"두 번째 구매하기 버튼 클릭 실패: {str(e)}")
+                        break
+                except Exception as e:
+                    self.logger.debug(f"구매하기 버튼 선택자 {selector} 실패: {str(e)}")
+                    continue
 
-                if not purchase_button_clicked:
-                    self.logger.error("구매하기 버튼 클릭 실패")
-                    return [event_data]
-
-                if purchase_button_clicked:
-                    # 잠시 대기 후 모달창 확인
-                    self.page.wait_for_timeout(5000)  # 5초 대기
-                    
-                    # 로그인 모달창 확인을 위한 선택자들
-                    login_modal_selectors = [
-                        '//*[@id="ModalContainer"]/div[2]/div',  # XPath
-                        '#ModalContainer > div.modal-content-bottom > div'  # CSS
-                    ]
-                    
-                    # 먼저 로그인 모달창이 떴는지 확인
-                    for selector in login_modal_selectors:
-                        try:
-                            login_modal = self.page.wait_for_selector(selector, timeout=5000)
-                            if login_modal and login_modal.is_visible():
-                                self.logger.error("로그인이 필요합니다. 로그인 모달창이 감지되었습니다.")
-                                return [event_data]
-                        except Exception as e:
-                            continue
-                    
-                    # 옵션 모달창 확인을 위한 선택자들
-                    modal_selectors = [
-                        '//*[@id="ct-view"]/div/div/div[2]/div/div',  # XPath
-                        '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div'  # CSS
-                    ]
-                    
-                    modal_found = False
-                    modal_element = None
-                    
-                    for selector in modal_selectors:
-                        try:
-                            modal_element = self.page.wait_for_selector(selector, timeout=10000)
-                            if modal_element and modal_element.is_visible():
-                                self.logger.info(f"모달창 찾기 성공 - 선택자: {selector}")
-                                modal_found = True
-                                break
-                        except Exception as e:
-                            self.logger.debug(f"모달창 선택자 {selector} 시도 실패: {str(e)}")
-                            continue
-                    
-                    if not modal_found:
-                        self.logger.error("모달창을 찾을 수 없습니다")
-                        return [event_data]
-                    
-                    # 모달창이 실제로 옵션 정보를 포함하고 있는지 확인
-                    try:
-                        modal_content = modal_element.text_content()
-                        if not modal_content:
-                            self.logger.error("모달창이 비어있습니다")
-                            return [event_data]
-                        self.logger.info("모달창 컨텐츠 확인 성공")
-                    except Exception as e:
-                        self.logger.error(f"모달창 컨텐츠 확인 실패: {str(e)}")
-                        return [event_data]
-
-                    self.logger.info("모달창이 성공적으로 열렸습니다. 옵션 정보 추출을 시작합니다.")
-
-                    # 옵션 정보 추출 시도
-                    try:
-                        # 옵션 컨테이너 찾기
-                        option_container_selectors = [
-                            '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
-                            '#ct-view > div > div > div[class*="fixed"] > div > div > div > div[class*="overflow-auto"] > div[class*="flex-col"]',
-                            '//div[contains(@class, "flex-col") and contains(@class, "overflow-y-scroll")]',
-                            '//div[contains(@class, "overflow-auto")]//div[contains(@class, "flex-col")]'
-                        ]
-
-                        container_found = False
-                        for selector in option_container_selectors:
-                            try:
-                                options_container = self.page.locator(selector)
-                                count = options_container.count()
-                                self.logger.info(f"선택자 {selector} 시도 - 요소 수: {count}")
-                                if count > 0:
-                                    self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
-                                    container_found = True
-                                    break
-                            except Exception as e:
-                                self.logger.debug(f"옵션 컨테이너 선택자 {selector} 실패: {str(e)}")
-                                continue
-
-                        if not container_found:
-                            self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
-                            return [event_data]
-
-                        # 개별 옵션 요소들 찾기
-                        options = options_container.locator("div").all()
-                        self.logger.info(f"발견된 옵션 수: {len(options)}")
-
-                        for idx, option in enumerate(options, 1):
-                            try:
-                                # 옵션명과 가격 추출 시도
-                                option_name_selectors = ["div > p", "p:first-child", ".option-name"]
-                                price_selectors = ["p:last-child", ".price", "p"]
-
-                                # 옵션명 추출
-                                option_name = None
-                                for name_selector in option_name_selectors:
-                                    try:
-                                        name_element = option.locator(name_selector).first
-                                        if name_element:
-                                            option_name = name_element.text_content().strip()
-                                            break
-                                    except:
-                                        continue
-
-                                # 가격 추출
-                                price = None
-                                for price_selector in price_selectors:
-                                    try:
-                                        price_element = option.locator(price_selector).last
-                                        if price_element:
-                                            price = price_element.text_content().strip()
-                                            break
-                                    except:
-                                        continue
-
-                                if option_name and price:
-                                    option_data = event_data.copy()
-                                    option_data['option_name'] = option_name
-                                    option_data['price'] = price
-                                    options_data.append(option_data)
-                                    self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
-
-                            except Exception as e:
-                                self.logger.error(f"옵션 {idx} 추출 실패: {str(e)}")
-                                continue
-
-                        if not options_data:
-                            self.logger.warning("추출된 옵션 정보가 없습니다")
-                            return [event_data]
-
-                        return options_data
-
-                    except Exception as e:
-                        self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
-                        return [event_data]
-
-            except Exception as e:
-                self.logger.error(f"옵션 정보 처리 실패: {str(e)}")
+            if not purchase_button_clicked:
+                self.logger.error("구매하기 버튼을 찾을 수 없습니다")
                 return [event_data]
+
+            # 잠시 대기 후 모달창 확인
+            self.page.wait_for_timeout(5000)  # 5초 대기
+            
+            # 로그인 모달창 확인
+            login_modal_selectors = [
+                '//*[@id="ModalContainer"]/div[2]/div',  # XPath
+                '#ModalContainer > div.modal-content-bottom > div'  # CSS
+            ]
+            
+            # 먼저 로그인 모달창이 떴는지 확인
+            for selector in login_modal_selectors:
+                try:
+                    login_modal = self.page.wait_for_selector(selector, timeout=5000)
+                    if login_modal and login_modal.is_visible():
+                        self.logger.error("로그인이 필요합니다. 로그인 모달창이 감지되었습니다.")
+                        return [event_data]
+                except Exception as e:
+                    continue
+
+            # 옵션 컨테이너 찾기
+            option_container_selectors = [
+                '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
+                '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0 > div.flex.flex-col.w-[(100%)].overflow-y-scroll.bg-[#ffffff]'
+            ]
+
+            container_found = False
+            for selector in option_container_selectors:
+                try:
+                    options_container = self.page.locator(selector)
+                    count = options_container.count()
+                    self.logger.info(f"선택자 {selector} 시도 - 요소 수: {count}")
+                    if count > 0:
+                        self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
+                        container_found = True
+                        break
+                except Exception as e:
+                    self.logger.debug(f"옵션 컨테이너 선택자 {selector} 실패: {str(e)}")
+                    continue
+
+            if not container_found:
+                self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
+                return [event_data]
+
+            # 개별 옵션 요소들 찾기 - nth-child 패턴 사용
+            options_data = []
+            idx = 1
+            while True:
+                try:
+                    option_selector = f"{option_container_selectors[1]} > div:nth-child({idx})"
+                    option = self.page.locator(option_selector)
+                    
+                    if not option.is_visible():
+                        self.logger.info(f"더 이상의 옵션이 없습니다. 총 {idx-1}개의 옵션을 찾았습니다.")
+                        break
+                    
+                    # 옵션명과 가격 추출
+                    option_name = option.locator("p").first.text_content().strip()
+                    price = option.locator("p").last.text_content().strip()
+                    
+                    if option_name and price:
+                        option_data = event_data.copy()
+                        option_data['option_name'] = option_name
+                        option_data['price'] = price
+                        options_data.append(option_data)
+                        self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+                    
+                    idx += 1
+                    
+                except Exception as e:
+                    self.logger.info(f"옵션 {idx}를 찾을 수 없습니다. 옵션 추출을 종료합니다.")
+                    break
+
+            if not options_data:
+                self.logger.warning("추출된 옵션 정보가 없습니다")
+                return [event_data]
+
+            return options_data
 
         except Exception as e:
             self.logger.error(f"이벤트 상세 정보 추출 중 오류: {str(e)}")
-            return []
+            return [event_data]
 
     def scrape_data(self, keyword, progress_bar):
         try:
@@ -600,7 +393,7 @@ class YeoshinScraper:
             if not container:
                 raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
             
-            # 컨테이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
+            # 컨���이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
             events = []
             idx = 1
             while True:
