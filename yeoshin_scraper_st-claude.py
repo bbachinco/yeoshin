@@ -578,7 +578,7 @@ class YeoshinScraper:
                     current_url = self.page.url
                     self.logger.info(f"현재 URL: {current_url}")
                     
-                    # 이벤트 요소 찾기 및 클릭
+                    # 이벤트 요��� 찾기 및 클릭
                     event_selector = (
                         f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
                         else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
