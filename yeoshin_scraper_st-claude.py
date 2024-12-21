@@ -399,56 +399,125 @@ class YeoshinScraper:
                     self.logger.error("구매하기 버튼 클릭 실패")
                     return [event_data]
 
-                # 구매하기 버튼 클릭 후 모달창 확인 로직
-                if purchase_button_clicked:
+                # 잠시 대기 후 모달창 확인
+                self.page.wait_for_timeout(5000)  # 5초 대기
+                
+                # 모달창 확인을 위한 선택자들
+                modal_selectors = [
+                    '//*[@id="ct-view"]/div/div/div[2]/div/div',  # XPath
+                    '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div'  # CSS
+                ]
+                
+                modal_found = False
+                modal_element = None
+                
+                for selector in modal_selectors:
                     try:
-                        # 모달창 선택자 정의
-                        modal_selectors = [
-                            '//*[@id="ct-view"]/div/div/div[2]/div/div',  # XPath
-                            '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div'  # CSS
-                        ]
-                        
-                        # 모달창 확인
-                        modal_found = False
-                        modal_element = None
-                        
-                        for selector in modal_selectors:
-                            try:
-                                # 타임아웃 10초로 설정하여 모달창 대기
-                                modal_element = self.page.wait_for_selector(
-                                    selector,
-                                    timeout=10000,
-                                    state='visible'  # 요소가 보이는 상태인지 확인
-                                )
-                                
-                                if modal_element and modal_element.is_visible():
-                                    self.logger.info(f"모달창 감지 성공 - 선택자: {selector}")
-                                    # 모달창 내용이 실제로 있는지 확인
-                                    modal_content = modal_element.inner_text()
-                                    if modal_content.strip():
-                                        self.logger.info("모달창 내용 확인됨")
-                                        modal_found = True
-                                        break
-                                    else:
-                                        self.logger.warning("모달창은 감지되었으나 내용이 비어있음")
-                            except Exception as e:
-                                self.logger.debug(f"모달창 선택자 {selector} 확인 실패: {str(e)}")
-                                continue
-                        
-                        if not modal_found:
-                            self.logger.error("모달창을 찾을 수 없거나 내용이 비어있습니다")
-                            return [event_data]
-                        
-                        # 모달창이 성공적으로 열렸을 때만 다음 단계(옵션 정보 추출) 진행
-                        self.logger.info("모달창이 성공적으로 열렸습니다. 옵션 정보 추출을 시작합니다.")
-                        return True
-
+                        modal_element = self.page.wait_for_selector(selector, timeout=10000)
+                        if modal_element and modal_element.is_visible():
+                            self.logger.info(f"모달창 찾기 성공 - 선택자: {selector}")
+                            modal_found = True
+                            break
                     except Exception as e:
-                        self.logger.error(f"모달창 확인 중 오류 발생: {str(e)}")
+                        self.logger.debug(f"모달창 선택자 {selector} 시도 실패: {str(e)}")
+                        continue
+                
+                if not modal_found:
+                    self.logger.error("모달창을 찾을 수 없습니다")
+                    return [event_data]
+                
+                # 모달창이 실제로 옵션 정보를 포함하고 있는지 확인
+                try:
+                    modal_content = modal_element.text_content()
+                    if not modal_content:
+                        self.logger.error("모달창이 비어있습니다")
+                        return [event_data]
+                    self.logger.info("모달창 컨텐츠 확인 성공")
+                except Exception as e:
+                    self.logger.error(f"모달창 컨텐츠 확인 실패: {str(e)}")
+                    return [event_data]
+
+                self.logger.info("모달창이 성공적으로 열렸습니다. 옵션 정보 추출을 시작합니다.")
+
+                # 옵션 정보 추출 시도
+                try:
+                    # 옵션 컨테이너 찾기
+                    option_container_selectors = [
+                        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
+                        '#ct-view > div > div > div[class*="fixed"] > div > div > div > div[class*="overflow-auto"] > div[class*="flex-col"]',
+                        '//div[contains(@class, "flex-col") and contains(@class, "overflow-y-scroll")]',
+                        '//div[contains(@class, "overflow-auto")]//div[contains(@class, "flex-col")]'
+                    ]
+
+                    container_found = False
+                    for selector in option_container_selectors:
+                        try:
+                            options_container = self.page.locator(selector)
+                            count = options_container.count()
+                            self.logger.info(f"선택자 {selector} 시도 - 요소 수: {count}")
+                            if count > 0:
+                                self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
+                                container_found = True
+                                break
+                        except Exception as e:
+                            self.logger.debug(f"옵션 컨테이너 선택자 {selector} 실패: {str(e)}")
+                            continue
+
+                    if not container_found:
+                        self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
                         return [event_data]
 
+                    # 개별 옵션 요소들 찾기
+                    options = options_container.locator("div").all()
+                    self.logger.info(f"발견된 옵션 수: {len(options)}")
+
+                    for idx, option in enumerate(options, 1):
+                        try:
+                            # 옵션명과 가격 추출 시도
+                            option_name_selectors = ["div > p", "p:first-child", ".option-name"]
+                            price_selectors = ["p:last-child", ".price", "p"]
+
+                            # 옵션명 추출
+                            option_name = None
+                            for name_selector in option_name_selectors:
+                                try:
+                                    name_element = option.locator(name_selector).first
+                                    if name_element:
+                                        option_name = name_element.text_content().strip()
+                                        break
+                                except:
+                                    continue
+
+                            # 가격 추출
+                            price = None
+                            for price_selector in price_selectors:
+                                try:
+                                    price_element = option.locator(price_selector).last
+                                    if price_element:
+                                        price = price_element.text_content().strip()
+                                        break
+                                except:
+                                    continue
+
+                            if option_name and price:
+                                option_data = event_data.copy()
+                                option_data['option_name'] = option_name
+                                option_data['price'] = price
+                                options_data.append(option_data)
+                                self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+
+                        except Exception as e:
+                            self.logger.error(f"옵션 {idx} 추출 실패: {str(e)}")
+                            continue
+
+                    if not options_data:
+                        self.logger.warning("추출된 옵션 정보가 없습니다")
+                        return [event_data]
+
+                    return options_data
+
                 except Exception as e:
-                    self.logger.error(f"옵션 정보 처리 실패: {str(e)}")
+                    self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
                     return [event_data]
 
             except Exception as e:
