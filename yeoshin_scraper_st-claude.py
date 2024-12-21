@@ -115,6 +115,10 @@ class YeoshinScraper:
             self.logger.info("Available secrets keys:")
             for key in st.secrets:
                 self.logger.info(f"- {key}")
+                if key == 'env':
+                    self.logger.info("env 내부 키:")
+                    for env_key in st.secrets.env:
+                        self.logger.info(f"  - {env_key}")
             
             # Playwright 브라우저만 설치 (의존성 설치 제외)
             subprocess.run(['playwright', 'install', 'chromium'], check=True)
@@ -144,11 +148,11 @@ class YeoshinScraper:
             # secrets에서 쿠키 값 가져오기 시도
             try:
                 required_cookies = {
-                    '_kau': st.secrets["KAU"],  # 대문자로 시도
-                    '_kahai': st.secrets["KAHAI"],
-                    '_karmt': st.secrets["KARMT"],
-                    '_kawlt': st.secrets["KAWLT"],
-                    'access_token': st.secrets["ACCESS_TOKEN"]
+                    '_kau': st.secrets.env.KAU,  # env 하위 키로 접근
+                    '_kahai': st.secrets.env.KAHAI,
+                    '_karmt': st.secrets.env.KARMT,
+                    '_kawlt': st.secrets.env.KAWLT,
+                    'access_token': st.secrets.env.ACCESS_TOKEN
                 }
             except Exception as e:
                 self.logger.error(f"Secrets 접근 오류: {str(e)}")
