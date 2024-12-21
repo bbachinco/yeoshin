@@ -653,18 +653,18 @@ def validate_data(df):
 
 def analyze_with_claude(df):
     try:
-        # 1. API 키 확인
+        # 1. API 키 확인 - 직접 ANTHROPIC_API_KEY로 설정
         try:
             api_key = st.secrets.env.CLAUDE_API_KEY
+            os.environ["ANTHROPIC_API_KEY"] = api_key  # Anthropic이 사용하는 환경 변수명으로 설정
             st.write("1. API 키 상태:", "있음" if api_key else "없음")
         except Exception as e:
             st.error(f"API 키를 찾을 수 없습니다: {str(e)}")
             return "API 키 없음"
         
-        # 2. Anthropic 객체 생성 - 완전히 기본 형태로
+        # 2. Anthropic 객체 생성 - 인자 없이 생성
         try:
-            # 클라이언트 생성
-            client = Anthropic(api_key=api_key)
+            client = Anthropic()  # API 키는 환경 변수에서 자동으로 가져감
             st.write("2. Anthropic 객체 생성 성공")
         except Exception as e:
             st.error(f"2. Anthropic 객체 생성 실패: {str(e)}")
