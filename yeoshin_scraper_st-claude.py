@@ -700,44 +700,49 @@ def analyze_with_claude(df):
             messages=[{"role": "user", "content": prompt}]
         )
         
-        try:
-            content = response.content[0].text if isinstance(response.content, list) else response.content
+        # response.content가 None인 경우 처리
+        if not response or not response.content:
+            st.error("Claude AI로부터 응답을 받지 못했습니다.")
+            return "분석을 수행할 수 없습니다."
             
-            st.header("🔍 AI 분석 결과")
+        # content가 리스트인 경우 첫 번째 요소의 text 속성 사용
+        content = response.content[0].text if isinstance(response.content, list) else response.content
+        
+        if not content:
+            st.error("분석 결과가 비어있습니다.")
+            return "분석 결과를 생성할 수 없습니다."
             
-            sections = {
-                "A": "옵션 분석 📊",
-                "B": "첫 번째 옵션 분석 💰",
-                "C": "위치 기반 분석 📍",
-                "D": "고객 반응 분석 👥"
-            }
+        st.header("🔍 AI 분석 결과")
+        
+        sections = {
+            "A": "옵션 분석 📊",
+            "B": "첫 번째 옵션 분석 💰",
+            "C": "위치 기반 분석 📍",
+            "D": "고객 반응 분석 👥"
+        }
+        
+        for section, title in sections.items():
+            st.subheader(f"{title}")
+            section_start = content.find(f"{section}.")
+            section_end = content.find(f"{chr(ord(section)+1)}.") if section != "D" else content.find("마지막으로")
             
-            for section, title in sections.items():
-                st.subheader(f"{title}")
-                section_start = content.find(f"{section}.")
-                section_end = content.find(f"{chr(ord(section)+1)}.") if section != "D" else content.find("마지막으로")
-                
-                if section_start != -1:
-                    section_content = content[section_start:section_end].strip()
-                    st.markdown(section_content)
-            
-            # 핵심 제언 표시
-            if "핵 제언" in content:
-                st.subheader("💡 새로운 이벤트 등록을 위한 핵심 제언")
-                recommendations = content[content.find("핵심 제언"):].split("\n")
-                for rec in recommendations[1:]:
-                    if rec.strip():
-                        st.info(rec.strip())
-            
-            return content
-            
-        except Exception as e:
-            st.error(f"분석 결과 표시 중 오류가 발생했습니다: {str(e)}")
-            return "분석 결과를 표시할 수 없습니다."
+            if section_start != -1:
+                section_content = content[section_start:section_end].strip()
+                st.markdown(section_content)
+        
+        # 핵심 제언 표시
+        if "핵심 제언" in content:
+            st.subheader("💡 새로운 이벤트 등록을 위한 핵심 제언")
+            recommendations = content[content.find("핵심 제언"):].split("\n")
+            for rec in recommendations[1:]:
+                if rec.strip():
+                    st.info(rec.strip())
+        
+        return content
             
     except Exception as e:
         st.error(f"Claude AI 분석 중 오류가 발생했습니다: {str(e)}")
-        return "분석을 행할 수 없습니다."
+        return "분석을 수행할 수 없습니다."
 
 
 def generate_pdf(df, analysis_text, fig_price, fig_dist):
