@@ -366,43 +366,37 @@ class YeoshinScraper:
             options_data = []  # 옵션 정보를 저장할 리스트
 
             try:
-                # 옵션 컨테이너 찾기
-                option_container_selectors = [
-                    '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
-                    '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]',
-                    '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0 > div.flex.flex-col.w-[(100%)].overflow-y-scroll.bg-[#ffffff]'
+                # 모달창 컨테이너 찾기
+                modal_container_selectors = [
+                    '//*[@id="ct-view"]/div/div/div[2]/div/div',
+                    '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div'
                 ]
 
-                container_found = False
-                for selector in option_container_selectors:
+                modal_found = False
+                modal_container = None
+                for selector in modal_container_selectors:
                     try:
-                        options_container = self.page.locator(selector)
-                        if options_container.count() > 0:
-                            self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
-                            container_found = True
+                        modal_container = self.page.locator(selector)
+                        if modal_container.count() > 0:
+                            self.logger.info(f"모달창 컨테이너 찾기 성공 - 선택자: {selector}")
+                            modal_found = True
                             break
                     except Exception as e:
                         continue
 
-                if not container_found:
-                    self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
+                if not modal_found:
+                    self.logger.error("모달창 컨테이너를 찾을 수 없습니다")
                     return [event_data]
 
-                # 개별 옵션 요소들 찾기
+                # 모달창 내부에서 옵션 리스트 컨테이너 찾기
                 try:
-                    options = []
-                    idx = 1
-                    while True:
-                        option_selector = f"{selector}/div[{idx}]"
-                        try:
-                            option = self.page.locator(option_selector)
-                            if option.count() == 0:
-                                break
-                            options.append(option)
-                            idx += 1
-                        except:
-                            break
+                    options_container = modal_container.locator('div.flex.flex-col.w-[(100%)].overflow-y-scroll.bg-[#ffffff]')
+                    if options_container.count() == 0:
+                        self.logger.error("옵션 리스트 컨테이너를 찾을 수 없습니다")
+                        return [event_data]
 
+                    # 개별 옵션 요소들 찾기
+                    options = options_container.locator('div').all()
                     self.logger.info(f"발견된 옵션 수: {len(options)}")
 
                     for idx, option in enumerate(options, 1):
