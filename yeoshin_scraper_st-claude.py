@@ -653,7 +653,7 @@ def validate_data(df):
 
 def analyze_with_claude(df):
     try:
-        # 1. API 키 확인 - st.secrets에서 가져오기
+        # 1. API 키 확인
         try:
             api_key = st.secrets.env.CLAUDE_API_KEY
             st.write("1. API 키 상태:", "있음" if api_key else "없음")
@@ -661,13 +661,18 @@ def analyze_with_claude(df):
             st.error(f"API 키를 찾을 수 없습니다: {str(e)}")
             return "API 키 없음"
         
-        # 2. Anthropic 객체 생성 - proxies 인자 제거
+        # 2. Anthropic 객체 생성 - 가장 기본적인 형태로 초기화
         try:
-            anthropic = Anthropic(api_key=api_key)
+            anthropic = Anthropic()  # API 키는 환경 변수에서 자동으로 가져옴
             st.write("2. Anthropic 객체 생성 성공")
         except Exception as e:
-            st.error(f"2. Anthropic 객체 생성 실패: {str(e)}")
-            return "Anthropic 객체 생성 실패"
+            # 환경 변수에서 가져오기 실패한 경우 직접 API 키 전달
+            try:
+                anthropic = Anthropic(api_key=api_key)
+                st.write("2. Anthropic 객체 생성 성공 (API 키 직접 전달)")
+            except Exception as e2:
+                st.error(f"2. Anthropic 객체 생성 최종 실패: {str(e2)}")
+                return "Anthropic 객체 생성 실패"
 
         # 3. 데이터 전처리 확인
         try:
