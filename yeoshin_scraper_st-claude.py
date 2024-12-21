@@ -50,14 +50,14 @@ class YeoshinScraper:
     def cleanup(self):
         """브라우저 정리를 위한 메서드"""
         try:
-            if self.page and self.page.is_connected():
+            if self.page:
                 self.page.close()
                 self.logger.info("페이지가 성공적으로 종료되었습니다.")
         except Exception as e:
             self.logger.error(f"페이지 종료 중 오류: {str(e)}")
         
         try:
-            if self.browser and not self.browser.is_closed():
+            if self.browser:
                 self.browser.close()
                 self.logger.info("브라우저가 성공적으로 종료되었습니다.")
         except Exception as e:
