@@ -653,7 +653,7 @@ def validate_data(df):
 
 def analyze_with_claude(df):
     try:
-        st.write("Claude API 키 확인:", os.getenv("CLAUDE_API_KEY")[:10] + "...")  # API 키의 처음 10자만 표시
+        st.write("Claude API 키 확인:", os.getenv("CLAUDE_API_KEY")[:10] + "...")
         anthropic = Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
         st.write("Anthropic 객체 생성 완료")   
              
@@ -700,18 +700,30 @@ def analyze_with_claude(df):
             messages=[{"role": "user", "content": prompt}]
         )
         
-        # response.content가 None인 경우 처리
-        if not response or not response.content:
+        # 응답 처리 수정
+        if not response:
             st.error("Claude AI로부터 응답을 받지 못했습니다.")
             return "분석을 수행할 수 없습니다."
-            
-        # content가 리스트인 경우 첫 번째 요소의 text 속성 사용
-        content = response.content[0].text if isinstance(response.content, list) else response.content
         
-        if not content:
-            st.error("분석 결과가 비어있습니다.")
-            return "분석 결과를 생성할 수 없습니다."
-            
+        try:
+            # content 속성에 직접 접근
+            content = response.content
+            if isinstance(content, list) and content:
+                content = content[0].text
+            elif hasattr(content, 'text'):
+                content = content.text
+            else:
+                content = str(content)
+                
+            if not content:
+                st.error("분석 결과가 비어있습니다.")
+                return "분석 결과를 생성할 수 없습니다."
+                
+        except Exception as e:
+            st.error(f"응답 처리 중 오류 발생: {str(e)}")
+            return "응답 처리 중 오류가 발생했습니다."
+        
+        # 섹션 처리 및 표시
         st.header("🔍 AI 분석 결과")
         
         sections = {
@@ -724,9 +736,16 @@ def analyze_with_claude(df):
         for section, title in sections.items():
             st.subheader(f"{title}")
             section_start = content.find(f"{section}.")
-            section_end = content.find(f"{chr(ord(section)+1)}.") if section != "D" else content.find("마지막으로")
-            
             if section_start != -1:
+                if section == "D":
+                    section_end = content.find("마지막으로")
+                else:
+                    next_section = chr(ord(section) + 1)
+                    section_end = content.find(f"{next_section}.")
+                
+                if section_end == -1:
+                    section_end = len(content)
+                    
                 section_content = content[section_start:section_end].strip()
                 st.markdown(section_content)
         
@@ -750,8 +769,8 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4)
         
-        # 나눔고딕 폰트 경로 지정 및 록
-        FONT_PATH = r"C:\Users\mctow\OneDrive\문서\바탕 화면\업무\성형어플\가격조사\여신티켓 웹스크래핑/NanumGothic.ttf"
+        # 나눔고딕 폰트 경로 수정 (깃허브 루트 디렉토리)
+        FONT_PATH = "NanumGothic.ttf"
         try:
             pdfmetrics.registerFont(TTFont('NanumGothic', FONT_PATH))
             registerFontFamily('NanumGothic', normal='NanumGothic')
