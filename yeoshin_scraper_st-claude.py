@@ -136,32 +136,43 @@ class YeoshinScraper:
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
             )
             
-            # 쿠키 설정
+            # 쿠키 설정 전에 필수 쿠키 값들이 있는지 확인
+            required_cookies = {
+                '_kau': os.getenv("_kau"),
+                '_kahai': os.getenv("_kahai"),
+                '_karmt': os.getenv("_karmt"),
+                '_kawlt': os.getenv("_kawlt"),
+                'access_token': os.getenv("ACCESS_TOKEN")
+            }
+            
+            # 필수 쿠키 중 하나라도 없으면 에러 발생
+            missing_cookies = [name for name, value in required_cookies.items() if not value]
+            if missing_cookies:
+                raise Exception(f"필수 쿠키가 없습니다: {', '.join(missing_cookies)}")
+            
             self.page.goto("https://www.yeoshin.co.kr")
             
-            cookies = [
-                {"name": "_kau", "value": os.getenv("_kau"), "domain": ".yeoshin.co.kr", "path": "/"},
-                {"name": "_kahai", "value": os.getenv("_kahai"), "domain": ".yeoshin.co.kr", "path": "/"},
-                {"name": "_karmt", "value": os.getenv("_karmt"), "domain": ".yeoshin.co.kr", "path": "/"},
-                {"name": "_kawlt", "value": os.getenv("_kawlt"), "domain": ".yeoshin.co.kr", "path": "/"},
-                {"name": "access_token", "value": os.getenv("ACCESS_TOKEN"), "domain": ".yeoshin.co.kr", "path": "/"}
-            ]
-
-            for cookie in cookies:
-                if cookie["value"] is None:
-                    self.logger.warning(f"Missing cookie value for: {cookie['name']}")
-                    continue
+            # 유효한 쿠키만 설정
+            for name, value in required_cookies.items():
+                cookie = {
+                    "name": name,
+                    "value": value,
+                    "domain": ".yeoshin.co.kr",
+                    "path": "/"
+                }
                 try:
                     self.page.context.add_cookies([cookie])
-                    self.logger.info(f"쿠키 설정 성공: {cookie['name']}")
+                    self.logger.info(f"쿠키 설정 성공: {name}")
                 except Exception as e:
-                    self.logger.error(f"쿠키 설정 실패 ({cookie['name']}): {str(e)}")
+                    self.logger.error(f"쿠키 설정 실패 ({name}): {str(e)}")
+                    raise Exception(f"쿠키 설정 실패: {name}")
 
             self.page.reload()
             
+            # 로그인 상태 확인
             if not self.check_login_status():
                 raise Exception("로그인 상태 확인 실패")
-
+            
         except Exception as e:
             self.logger.error(f"Playwright setup error: {str(e)}")
             raise e
