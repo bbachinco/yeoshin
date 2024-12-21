@@ -653,11 +653,15 @@ def validate_data(df):
 
 def analyze_with_claude(df):
     try:
-        # 1. API 키 확인
-        api_key = os.getenv("CLAUDE_API_KEY")
-        st.write("1. API 키 상태:", "있음" if api_key else "없음")
+        # 1. API 키 확인 - st.secrets에서 가져오기
+        try:
+            api_key = st.secrets.env.CLAUDE_API_KEY
+            st.write("1. API 키 상태:", "있음" if api_key else "없음")
+        except Exception as e:
+            st.error(f"API 키를 찾을 수 없습니다: {str(e)}")
+            return "API 키 없음"
         
-        # 2. Anthropic 객체 생성
+        # 2. Anthropic 객체 생성 - proxies 인자 제거
         try:
             anthropic = Anthropic(api_key=api_key)
             st.write("2. Anthropic 객체 생성 성공")
