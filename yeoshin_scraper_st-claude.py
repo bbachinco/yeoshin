@@ -359,153 +359,78 @@ class YeoshinScraper:
                 'price': "가격 정보 없음"
             }
 
-            # 옵션 정보 추출 로직은 그대로 유지...
-            
-            # 옵션 정보 추출
-            self.logger.info("옵션 정보 추출 시도...")
-            options_data = []  # 옵션 정보를 저장할 리스트
-
+            # 옵션 정보 추출 로직 수정
             try:
-                # 구매하기 버튼이 있는 섹션 찾기
-                section_selector = '//*[@id="ct-view"]/div/div/section'
-                section = self.page.locator(section_selector)
-                self.logger.info("구매하기 버튼 섹션 찾기 성공")
-
-                # 섹션 내의 모든 버튼 찾기
-                buttons = section.locator("button")
-                button_count = buttons.count()
-                self.logger.info(f"발견된 버튼 수: {button_count}")
-
-                # 버튼 클릭 시도
-                purchase_button_clicked = False
+                # 옵션 컨테이너 선택자 정의
+                container_selectors = {
+                    'xpath': '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]',
+                    'css': '#ct-view > div > div > div.fixed.top-0.h-[100%].w-[100vw].z-[999].bg-black.bg-opacity-40.max-w-[var(--mobile-max-width)] > div > div > div > div.h-[100%].max-h-[100%].overflow-auto.scroll-auto.mx-[21px].rounded-bl-[12px].rounded-br-[12px].border.border-solid.border-[#616161].border-t-0'
+                }
                 
-                if button_count == 1:
+                # 옵션 컨테이너 찾기
+                container = None
+                for selector_type, selector in container_selectors.items():
                     try:
-                        buttons.first.click()
-                        self.logger.info("단일 구매하기 버튼 클릭 성공")
-                        purchase_button_clicked = True
+                        if selector_type == 'xpath':
+                            container = self.page.locator(f"xpath={selector}")
+                        else:
+                            container = self.page.locator(selector)
+                            
+                        if container.count() > 0:
+                            self.logger.info(f"옵션 컨테이너 찾기 성공 - {selector_type}")
+                            break
                     except Exception as e:
-                        self.logger.error(f"단일 구매하기 버튼 클릭 실패: {str(e)}")
-                
-                elif button_count >= 2:
-                    try:
-                        buttons.nth(1).click()  # 두 번째 버튼 클릭
-                        self.logger.info("두 번째 구매하기 버튼 클릭 성공")
-                        purchase_button_clicked = True
-                    except Exception as e:
-                        self.logger.error(f"두 번째 구매하기 버튼 클릭 실패: {str(e)}")
-
-                if not purchase_button_clicked:
-                    self.logger.error("구매하기 버튼 클릭 실패")
-                    return [event_data]
-
-                # 잠시 대기 후 모달창 확인
-                self.page.wait_for_timeout(5000)  # 5초 대기
-                
-                # 여러 가능한 모달창 선택자 시도
-                modal_selectors = [
-                    '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
-                    '//*[@id="ct-view"]/div/div/div[2]',  # 상위 요소
-                    '//div[contains(@class, "modal") or contains(@class, "popup")]'  # 일반적인 모달 클래스
-                ]
-                
-                modal_found = False
-                for selector in modal_selectors:
-                    try:
-                        self.page.wait_for_selector(selector, timeout=10000)  # 타임아웃 증가
-                        self.logger.info(f"모달창 찾기 성공 - 선택자: {selector}")
-                        modal_found = True
-                        break
-                    except Exception as e:
-                        self.logger.debug(f"모달창 선택자 {selector} 실패")
+                        self.logger.debug(f"옵션 컨테이너 선택자 {selector_type} 실패: {str(e)}")
                         continue
                 
-                if not modal_found:
-                    self.logger.error("모달창을 찾을 수 없습니다")
+                if not container:
+                    self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
                     return [event_data]
 
-                self.logger.info("모달창 로딩 완료")
-
-                # 옵션 정보 추출 시도
-                try:
-                    # 옵션 컨테이너 찾기
-                    option_container_selectors = [
-                        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
-                        '#ct-view > div > div > div[class*="fixed"] > div > div > div > div[class*="overflow-auto"] > div[class*="flex-col"]',
-                        '//div[contains(@class, "flex-col") and contains(@class, "overflow-y-scroll")]',
-                        '//div[contains(@class, "overflow-auto")]//div[contains(@class, "flex-col")]'
-                    ]
-
-                    container_found = False
-                    for selector in option_container_selectors:
-                        try:
-                            options_container = self.page.locator(selector)
-                            count = options_container.count()
-                            self.logger.info(f"선택자 {selector} 시도 - 요소 수: {count}")
-                            if count > 0:
-                                self.logger.info(f"옵션 컨테이너 찾기 성공 - 선택자: {selector}")
-                                container_found = True
-                                break
-                        except Exception as e:
-                            self.logger.debug(f"옵션 컨테이너 선택자 {selector} 실패: {str(e)}")
-                            continue
-
-                    if not container_found:
-                        self.logger.error("옵션 컨테이너를 찾을 수 없습니다")
-                        return [event_data]
-
-                    # 개별 옵션 요소들 찾기
-                    options = options_container.locator("div").all()
-                    self.logger.info(f"발견된 옵션 수: {len(options)}")
-
-                    for idx, option in enumerate(options, 1):
-                        try:
-                            # 옵션명과 가격 추출 시도
-                            option_name_selectors = ["div > p", "p:first-child", ".option-name"]
-                            price_selectors = ["p:last-child", ".price", "p"]
-
-                            # 옵션명 추출
-                            option_name = None
-                            for name_selector in option_name_selectors:
-                                try:
-                                    name_element = option.locator(name_selector).first
-                                    if name_element:
-                                        option_name = name_element.text_content().strip()
-                                        break
-                                except:
-                                    continue
-
-                            # 가격 추출
-                            price = None
-                            for price_selector in price_selectors:
-                                try:
-                                    price_element = option.locator(price_selector).last
-                                    if price_element:
-                                        price = price_element.text_content().strip()
-                                        break
-                                except:
-                                    continue
-
-                            if option_name and price:
-                                option_data = event_data.copy()
-                                option_data['option_name'] = option_name
-                                option_data['price'] = price
-                                options_data.append(option_data)
-                                self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
-
-                        except Exception as e:
-                            self.logger.error(f"옵션 {idx} 추출 실패: {str(e)}")
-                            continue
-
-                    if not options_data:
-                        self.logger.warning("추출된 옵션 정보가 없습니다")
-                        return [event_data]
-
-                    return options_data
-
-                except Exception as e:
-                    self.logger.error(f"옵션 정보 추출 중 오류: {str(e)}")
+                # 개별 옵션 요소 선택자 패턴
+                options_base_xpath = '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]/div'
+                
+                # 개별 옵션 정보 추출
+                options_data = []
+                idx = 1
+                while True:
+                    try:
+                        # 각 옵션 요소 찾기
+                        option_xpath = f"{options_base_xpath}[{idx}]"
+                        option = self.page.locator(f"xpath={option_xpath}")
+                        
+                        if not option or option.count() == 0:
+                            break
+                        
+                        # 옵션명과 가격 추출
+                        option_text = option.text_content()
+                        if not option_text:
+                            break
+                            
+                        # 옵션 정보 파싱
+                        lines = option_text.strip().split('\n')
+                        if len(lines) >= 2:
+                            option_name = lines[0].strip()
+                            price = lines[-1].strip()
+                            
+                            option_data = event_data.copy()
+                            option_data['option_name'] = option_name
+                            option_data['price'] = price
+                            options_data.append(option_data)
+                            
+                            self.logger.info(f"옵션 {idx} 추출 성공 - 이름: {option_name}, 가격: {price}")
+                        
+                        idx += 1
+                        
+                    except Exception as e:
+                        self.logger.error(f"옵션 {idx} 추출 실패: {str(e)}")
+                        break
+                
+                if not options_data:
+                    self.logger.warning("추출된 옵션 정보가 없습니다")
                     return [event_data]
+                    
+                return options_data
 
             except Exception as e:
                 self.logger.error(f"옵션 정보 처리 실패: {str(e)}")
