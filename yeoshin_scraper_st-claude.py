@@ -578,7 +578,7 @@ class YeoshinScraper:
                     current_url = self.page.url
                     self.logger.info(f"현재 URL: {current_url}")
                     
-                    # 이벤트 요��� 찾기 및 클릭
+                    # 이벤트 요소 찾기 및 클릭
                     event_selector = (
                         f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
                         else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
@@ -869,6 +869,24 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
     except Exception as e:
         st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
         return None
+
+def find_option_container(driver):
+    logger.info("모달 내부 HTML 구조:")
+    modal = driver.find_element(By.XPATH, '//div[contains(@class, "modal") or contains(@class, "popup")]')
+    logger.info(modal.get_attribute('outerHTML'))  # 모달의 전체 HTML 구조 출력
+
+    # 모달 내부의 모든 div 요소 찾기
+    all_divs = modal.find_elements(By.TAG_NAME, 'div')
+    logger.info(f"모달 내부 div 요소 수: {len(all_divs)}")
+    
+    # 기존 컨테이너 찾기 로직
+    selectors = [
+        '//*[@id="ct-view"]/div/div/div[2]/div/div/div/div[2]/div[2]',
+        '#ct-view > div > div > div[class*="fixed"] > div > div > div > div[class*="overflow-auto"] > div[class*="flex-col"]',
+        '//div[contains(@class, "flex-col") and contains(@class, "overflow-y-scroll")]',
+        '//div[contains(@class, "overflow-auto")]//div[contains(@class, "flex-col")]'
+    ]
+    # ... 나머지 코드 ...
 
 def main():
     st.title("여신티켓 데이터 스크래퍼")
