@@ -148,10 +148,10 @@ class YeoshinScraper:
             # secrets에서 쿠키 값 가져오기 시도
             try:
                 required_cookies = {
-                    '_kau': st.secrets.env.KAU,  # env 하위 키로 접근
-                    '_kahai': st.secrets.env.KAHAI,
-                    '_karmt': st.secrets.env.KARMT,
-                    '_kawlt': st.secrets.env.KAWLT,
+                    '_kau': st.secrets.env._kau,  # 원래 키 이름 사용
+                    '_kahai': st.secrets.env._kahai,
+                    '_karmt': st.secrets.env._karmt,
+                    '_kawlt': st.secrets.env._kawlt,
                     'access_token': st.secrets.env.ACCESS_TOKEN
                 }
             except Exception as e:
