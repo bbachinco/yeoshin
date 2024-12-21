@@ -138,11 +138,11 @@ class YeoshinScraper:
             
             # 쿠키 설정 전에 필수 쿠키 값들이 있는지 확인
             required_cookies = {
-                '_kau': os.getenv("_kau"),
-                '_kahai': os.getenv("_kahai"),
-                '_karmt': os.getenv("_karmt"),
-                '_kawlt': os.getenv("_kawlt"),
-                'access_token': os.getenv("ACCESS_TOKEN")
+                '_kau': st.secrets["_kau"],
+                '_kahai': st.secrets["_kahai"],
+                '_karmt': st.secrets["_karmt"],
+                '_kawlt': st.secrets["_kawlt"],
+                'access_token': st.secrets["ACCESS_TOKEN"]
             }
             
             # 필수 쿠키 중 하나라도 없으면 에러 발생
