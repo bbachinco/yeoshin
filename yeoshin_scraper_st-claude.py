@@ -844,7 +844,7 @@ def main():
         progress_bar = st.progress(0)
         scraper = YeoshinScraper()
         
-        with st.spinner('태팀장 : 데이터를 수집중입니다...오 걸리니까 커피 한 잔 하고 오세요.)'):
+        with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
             df = scraper.scrape_data(keyword, progress_bar)
             
         # 먼저 영문 컬럼명으로 데이터 검증
