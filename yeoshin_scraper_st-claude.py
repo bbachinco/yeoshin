@@ -874,6 +874,14 @@ async def process_data(keyword):
         return None
 
 def main():
+    # session_state 초기화
+    if 'df' not in st.session_state:
+        st.session_state.df = None
+    if 'analysis_text' not in st.session_state:
+        st.session_state.analysis_text = None
+    if 'fig_price' not in st.session_state:
+        st.session_state.fig_price = None
+
     st.title("여신티켓 이벤트 수집기")
     
     keyword = st.text_input("검색어를 입력하세요:")
