@@ -202,26 +202,22 @@ class YeoshinScraper:
             self.logger.error(f"Playwright setup error: {str(e)}")
             raise e
 
-    def wait_for_page_load(self, timeout=30000):
+    def wait_for_page_load(self, timeout=15000):
         """페이지 로딩 대기"""
         try:
             self.page.wait_for_load_state("networkidle", timeout=timeout)
-            self.page.wait_for_timeout(5000)
+            self.page.wait_for_timeout(2000)
         except PlaywrightTimeoutError:
             self.logger.warning("페이지 로딩 시간 초과")
 
     def scroll_to_load_all(self):
         """전체 페이지 스크롤"""
-        for _ in range(5):
+        for _ in range(3):
             try:
-                # 현재 높이 저장
                 previous_height = self.page.evaluate("document.body.scrollHeight")
-                
-                # 스크롤 수행
                 self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                self.page.wait_for_timeout(3000)
+                self.page.wait_for_timeout(1500)
                 
-                # 새로운 컨텐츠가 로드되었는지 확인
                 current_height = self.page.evaluate("document.body.scrollHeight")
                 if current_height == previous_height:
                     break
