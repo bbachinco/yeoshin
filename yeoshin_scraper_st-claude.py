@@ -522,6 +522,8 @@ class YeoshinScraper:
             return []
 
     def scrape_data(self, keyword, progress_bar):
+        all_events_data = []  # 데이터 저장용 리스트를 try 블록 밖에서 초기화
+        
         try:
             self.cleanup()
             self.setup_driver()
@@ -552,7 +554,7 @@ class YeoshinScraper:
             if not container:
                 raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
             
-            # 먼저 전체 검색 결과 수 파악
+            # 전체 검색 결과 수 파악
             idx = 1
             total_items = 0
             while True:
@@ -576,67 +578,58 @@ class YeoshinScraper:
                 st.warning(f"검색 결과가 총 {total_items}개입니다. 안정적인 데이터 수집을 위해 상위 {MAX_ITEMS}개의 이벤트만 수집합니다.")
             else:
                 st.info(f"총 {total_items}개의 이벤트가 검색되었습니다.")
-
-            # 모든 이벤트의 데이터를 저장할 리스트
-            all_events_data = []
             
-            try:
-                # 검색 URL 저장
-                search_url = f"https://www.yeoshin.co.kr/search/category?q={keyword}&tab=events"
-                
-                for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
-                    try:
-                        self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
-                        progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
-                        
-                        # 매 이벤트 처리 전 검색 결과 페이지로 돌아가기
-                        self.page.goto(search_url)
-                        self.wait_for_page_load()
-                        
-                        # 이벤트 요소 찾기 및 클릭
-                        event_selector = (
-                            f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
-                            else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
-                        )
-                        
-                        try:
-                            event = self.page.locator(event_selector)
-                            event.click()
-                            time.sleep(1)
-                            self.logger.info(f"{idx}번째 이벤트 클릭 성공")
-                            
-                            # 이벤트 상세 정보 수집
-                            item_data = self.get_event_details(None, progress_value, progress_bar)
-                            if item_data:
-                                all_events_data.extend(item_data)
-                                self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
-                            
-                            # 10개 단위로 임시 저장
-                            if len(all_events_data) % 10 == 0:
-                                st.session_state.temp_df = pd.DataFrame(all_events_data)
-                                
-                        except Exception as e:
-                            self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
-                            continue
-                        
-                        progress_bar.progress(progress_value)
-                        
-                    except Exception as e:
-                        self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
-                        continue
-                
-                return pd.DataFrame(all_events_data)
-                
-            except Exception as e:
-                self.logger.error(f"스크래핑 중 오류 발생: {str(e)}")
-                if all_events_data:
-                    return pd.DataFrame(all_events_data)
-                return pd.DataFrame()
-                
-            finally:
-                if 'all_events_data' in locals() and all_events_data:
-                    st.session_state.final_df = pd.DataFrame(all_events_data)
-                self.cleanup()
+            # 검색 URL 저장
+            search_url = f"https://www.yeoshin.co.kr/search/category?q={keyword}&tab=events"
+            
+            # 각 이벤트마다 상세 정보 수집
+            for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
+                try:
+                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
+                    progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
+                    
+                    # 매 이벤트 처리 전 검색 결과 페이지로 돌아가기
+                    self.page.goto(search_url)
+                    self.wait_for_page_load()
+                    
+                    # 이벤트 요소 찾기 및 클릭
+                    event_selector = (
+                        f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
+                        else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
+                    )
+                    
+                    event = self.page.locator(event_selector)
+                    event.click()
+                    time.sleep(1)
+                    self.logger.info(f"{idx}번째 이벤트 클릭 성공")
+                    
+                    # 이벤트 상세 정보 수집
+                    item_data = self.get_event_details(None, progress_value, progress_bar)
+                    if item_data:
+                        all_events_data.extend(item_data)
+                        self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
+                    
+                    # 10개 단위로 임시 저장
+                    if len(all_events_data) % 10 == 0:
+                        st.session_state.temp_df = pd.DataFrame(all_events_data)
+                    
+                    progress_bar.progress(progress_value)
+                    
+                except Exception as e:
+                    self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
+                    continue
+        
+        except Exception as e:
+            self.logger.error(f"스크래핑 중 오류 발생: {str(e)}")
+        
+        finally:
+            # 수집된 데이터가 있으면 DataFrame으로 변환하여 저장
+            if all_events_data:
+                st.session_state.final_df = pd.DataFrame(all_events_data)
+            self.cleanup()
+            
+            # 수집된 데이터 반환
+            return pd.DataFrame(all_events_data) if all_events_data else pd.DataFrame()
 
 def create_visualizations(df):
     """데이터 시각화 생성"""
