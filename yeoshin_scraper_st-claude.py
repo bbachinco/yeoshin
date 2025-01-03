@@ -536,8 +536,14 @@ class YeoshinScraper:
             CHUNK_SIZE = 20  # 한 번에 처리할 이벤트 수
             all_events_data = []
             current_chunk = []
+            last_processed_index = 0  # 마지막으로 처리된 인덱스 추적
             
-            idx = 1
+            # 세션 상태에서 마지막 처리 인덱스 복구
+            if 'last_processed_index' in st.session_state:
+                last_processed_index = st.session_state['last_processed_index']
+                all_events_data = st.session_state.get('all_events_data', [])
+            
+            idx = last_processed_index + 1
             while True:
                 try:
                     event_selector = (
@@ -550,7 +556,7 @@ class YeoshinScraper:
                         break
                     
                     self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ===")
-                    progress_value = 0.3 + (0.7 * (idx / (idx + 1)))  # 진행률 계산 수정
+                    progress_value = 0.3 + (0.7 * (idx / (idx + 1)))
                     
                     # 현재 URL 저장
                     current_url = self.page.url
@@ -558,7 +564,7 @@ class YeoshinScraper:
                     try:
                         event = self.page.locator(event_selector)
                         event.click()
-                        time.sleep(2)  # 대기 시간 단축
+                        time.sleep(2)
                         
                         item_data = self.get_event_details(None, progress_value, progress_bar)
                         if item_data:
@@ -568,18 +574,18 @@ class YeoshinScraper:
                         # 검색 결과 페이지로 돌아가기
                         self.page.goto(current_url)
                         self.wait_for_page_load()
-                        time.sleep(1)  # 대기 시간 단축
+                        time.sleep(1)
                         
                     except Exception as e:
                         self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
                         continue
                     
-                    # 청크 단위로 데이터 처리
+                    # 청크 단위로 데이터 처리 및 상태 저장
                     if len(current_chunk) >= CHUNK_SIZE:
                         all_events_data.extend(current_chunk)
-                        # 중간 결과를 DataFrame으로 변환하여 표시
-                        temp_df = pd.DataFrame(all_events_data)
-                        st.session_state['current_results'] = temp_df
+                        st.session_state['all_events_data'] = all_events_data
+                        st.session_state['last_processed_index'] = idx
+                        st.session_state['current_results'] = pd.DataFrame(all_events_data)
                         current_chunk = []
                     
                     progress_bar.progress(progress_value)
@@ -590,11 +596,19 @@ class YeoshinScraper:
                     break
                 except Exception as e:
                     self.logger.error(f"이벤트 처리 중 오류 발생: {str(e)}")
+                    # 오류 발생 시에도 현재 상태 저장
+                    st.session_state['last_processed_index'] = idx - 1
                     break
             
             # 남은 데이터 처리
             if current_chunk:
                 all_events_data.extend(current_chunk)
+            
+            # 모든 처리가 완료되면 세션 상태 초기화
+            if 'last_processed_index' in st.session_state:
+                del st.session_state['last_processed_index']
+            if 'all_events_data' in st.session_state:
+                del st.session_state['all_events_data']
             
             self.logger.info(f"\n=== 전체 {idx-1}개 중 {len(all_events_data)}개 이벤트 데이터 수집 완료 ===")
             return pd.DataFrame(all_events_data)
