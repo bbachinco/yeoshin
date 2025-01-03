@@ -532,9 +532,11 @@ class YeoshinScraper:
             if not container:
                 raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
             
-            # 컨테이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
+            # 컨테이너 내의 모든 이벤트 항목 찾기
             events = []
             idx = 1
+            MAX_ITEMS = 50  # 최대 스크래핑 개수 설정
+            
             while True:
                 try:
                     event_selector = (
@@ -545,20 +547,32 @@ class YeoshinScraper:
                     events.append(event)
                     self.logger.info(f"{idx}번째 이벤트 요소 찾기 성공")
                     idx += 1
+                    
+                    # 최대 개수 도달 시 중단
+                    if len(events) >= MAX_ITEMS:
+                        self.logger.info(f"최대 스크래핑 개수({MAX_ITEMS}개)에 도달했습니다")
+                        break
+                        
                 except Exception as e:
                     break
             
             total_items = len(events)
             self.logger.info(f"총 {total_items}개의 이벤트를 찾았습니다")
             
+            # 검색 결과 수에 따른 메시지 생성
+            if idx > MAX_ITEMS:
+                st.warning(f"검색 결과가 {idx-1}개로 매우 많습니다. 상위 {MAX_ITEMS}개의 이벤트만 수집합니다.")
+            else:
+                st.info(f"총 {total_items}개의 이벤트가 검색되었습니다.")
+
             # 모든 이벤트의 데이터를 저장할 리스트
             all_events_data = []
             
-            # 각 이벤트마다 상세 정보 수집
-            for idx in range(1, total_items + 1):
+            # 각 이벤트마다 상세 정보 수집 (최대 MAX_ITEMS개까지만)
+            for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
                 try:
-                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{total_items}) ===")
-                    progress_value = 0.3 + (0.7 * (idx / total_items))
+                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
+                    progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
                     
                     # 현재 URL 저장
                     current_url = self.page.url
