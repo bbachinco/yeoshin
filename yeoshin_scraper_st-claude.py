@@ -256,21 +256,41 @@ class YeoshinScraper:
             
             # 이벤트명 추출
             self.logger.info("이벤트명 추출 시도...")
-            event_name_selectors = [
+            
+            # NEW 태그가 있는 경우의 이벤트명 셀렉터
+            new_event_selector = '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/h1/span[2]'
+            
+            # 일반적인 경우의 이벤트명 셀렉터
+            regular_event_selectors = [
                 '//*[@id="ct-view"]/div/div/div[1]/div[2]/article/h1/span',
                 '#ct-view > div > div > div.relative.flex-col > div.sc-68757109-1.kfwxBJ > article > h1 > span'
             ]
             
             event_name = None
-            for selector in event_name_selectors:
-                try:
-                    element = self.page.locator(selector).first
+            
+            # 먼저 NEW 태그가 있는지 확인
+            try:
+                new_tag = self.page.locator('//*[@id="ct-view"]/div/div/div[1]/div[2]/article/h1/span[1]').first
+                if new_tag and 'NEW' in new_tag.text_content().strip().upper():
+                    # NEW 태그가 있는 경우, span[2]에서 이벤트명 추출
+                    element = self.page.locator(new_event_selector).first
                     if element:
                         event_name = element.text_content().strip()
-                        self.logger.info(f"이벤트명 추출 성공 - 값: {event_name}")
-                        break
-                except Exception as e:
-                    continue
+                        self.logger.info(f"NEW 태그가 있는 이벤트명 추출 성공 - 값: {event_name}")
+            except Exception as e:
+                self.logger.debug(f"NEW 태그 확인 중 예외 발생: {str(e)}")
+            
+            # NEW 태그에서 추출 실패하거나 NEW 태그가 없는 경우, 기존 방식으로 시도
+            if not event_name:
+                for selector in regular_event_selectors:
+                    try:
+                        element = self.page.locator(selector).first
+                        if element:
+                            event_name = element.text_content().strip()
+                            self.logger.info(f"일반 이벤트명 추출 성공 - 값: {event_name}")
+                            break
+                    except Exception as e:
+                        continue
 
             # 평점과 리뷰수 추출
             try:
