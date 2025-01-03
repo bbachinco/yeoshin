@@ -580,58 +580,63 @@ class YeoshinScraper:
             # 모든 이벤트의 데이터를 저장할 리스트
             all_events_data = []
             
-            # 각 이벤트마다 상세 정보 수집 (최대 MAX_ITEMS개까지만)
-            for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
-                try:
-                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
-                    progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
-                    
-                    # 현재 URL 저장
-                    current_url = self.page.url
-                    self.logger.info(f"현재 URL: {current_url}")
-                    
-                    # 이벤트 요소 찾기 및 클릭
-                    event_selector = (
-                        f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
-                        else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
-                    )
-                    
+            try:
+                # 각 이벤트마다 상세 정보 수집 (최대 MAX_ITEMS개까지만)
+                for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
                     try:
-                        # click() 메서드 직접 사용
-                        event = self.page.locator(event_selector)
-                        event.click()
-                        time.sleep(1)
-                        self.logger.info(f"{idx}번째 이벤트 클릭 성공")
+                        self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
+                        progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
                         
-                        # 이벤트 상세 정보 수집
-                        item_data = self.get_event_details(None, progress_value, progress_bar)
-                        if item_data:
-                            all_events_data.extend(item_data)
-                            self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
+                        # 현재 URL 저장
+                        current_url = self.page.url
+                        self.logger.info(f"현재 URL: {current_url}")
                         
-                        # 검색 결과 페이지로 돌아가기
-                        self.page.goto(current_url)
-                        self.wait_for_page_load()
-                        time.sleep(1)
+                        # 이벤트 요소 찾기 및 클릭
+                        event_selector = (
+                            f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
+                            else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
+                        )
+                        
+                        try:
+                            # click() 메서드 직접 사용
+                            event = self.page.locator(event_selector)
+                            event.click()
+                            time.sleep(1)
+                            self.logger.info(f"{idx}번째 이벤트 클릭 성공")
+                            
+                            # 이벤트 상세 정보 수집
+                            item_data = self.get_event_details(None, progress_value, progress_bar)
+                            if item_data:
+                                all_events_data.extend(item_data)
+                                self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
+                            
+                            # 검색 결과 페이지로 돌아가기 전에 현재 데이터 저장
+                            if len(all_events_data) % 10 == 0:
+                                st.session_state.temp_df = pd.DataFrame(all_events_data)
+                            
+                        except Exception as e:
+                            self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
+                            continue
+                        
+                        progress_bar.progress(progress_value)
                         
                     except Exception as e:
-                        self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
+                        self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
                         continue
-                    
-                    progress_bar.progress(progress_value)
-                    
-                except Exception as e:
-                    self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
-                    continue
-
-            self.logger.info(f"\n=== 전체 {total_items}개 중 {len(all_events_data)}개 이벤트 데이터 수집 완료 ===")
-            
-            return pd.DataFrame(all_events_data)
                 
-        except Exception as e:
-            self.logger.error(f"스크래핑 중 오류 발생: {str(e)}")
-            return pd.DataFrame()
+                return pd.DataFrame(all_events_data)
+                
+            except Exception as e:
+                self.logger.error(f"스크래핑 중 오류 발생: {str(e)}")
+                # 부분적으로 수집된 데이터라도 반환
+                if all_events_data:
+                    return pd.DataFrame(all_events_data)
+                return pd.DataFrame()
+            
         finally:
+            # cleanup 전에 수집된 데이터 확인
+            if 'all_events_data' in locals() and all_events_data:
+                st.session_state.final_df = pd.DataFrame(all_events_data)
             self.cleanup()
 
 def create_visualizations(df):
@@ -752,7 +757,6 @@ def analyze_with_openai(df):
             return "응답 처리 실패"
 
         return content
-
     except Exception as e:
         st.error(f"전체 프로세스 실패: {str(e)}")
         return "분석을 수행할 수 없습니다."
@@ -774,44 +778,56 @@ def main():
         progress_bar = st.progress(0)
         scraper = YeoshinScraper()
         
-        # 데이터 수집
-        with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
-            st.session_state.df = scraper.scrape_data(keyword, progress_bar)
-            
-        # 먼이터 검증 및 표시
-        if not st.session_state.df.empty and validate_data(st.session_state.df):
-            st.success("데이터 수집이 완료되었습니다!")
-            
-            # 컬럼명을 한글로 변경
-            column_names = {
-                'hospital_name': '병원명',
-                'location': '위치',
-                'event_name': '이벤트명',
-                'option_name': '옵션명',
-                'price': '가격',
-                'rating': '평점',
-                'review_count': '리뷰수',
-                'scrap_count': '스크랩수',
-                'inquiry_count': '문의수'
-            }
-            st.session_state.df = st.session_state.df.rename(columns=column_names)
-            
-            # 수집된 데이터 즉시 표시
-            st.write("수집된 데이터:")
-            st.dataframe(st.session_state.df, height=400)
-            
-            # 시각화 생성 및 표시
-            st.session_state.fig_price = create_visualizations(st.session_state.df)
-            st.plotly_chart(st.session_state.fig_price)
-            
-            # AI 분석 시작
-            with st.spinner('AI 분석을 수행중입니다...'):
-                analysis_result = analyze_with_openai(st.session_state.df)
-                st.session_state.analysis_text = analysis_result
+        try:
+            # 데이터 수집
+            with st.spinner('태팀장 : 데이터를 수집중입니다...'):
+                df = scraper.scrape_data(keyword, progress_bar)
                 
-                # AI 분석 결과 표시
-                st.subheader("AI 분석 결과")
-                st.write(analysis_result)
+                # 임시 저장된 데이터가 있는지 확인
+                if df.empty and 'temp_df' in st.session_state:
+                    df = st.session_state.temp_df
+                    st.warning("일부 데이터만 수집되었습니다.")
+                
+                if not df.empty:
+                    st.session_state.df = df
+                    
+                    # 컬럼명을 한글로 변경
+                    column_names = {
+                        'hospital_name': '병원명',
+                        'location': '위치',
+                        'event_name': '이벤트명',
+                        'option_name': '옵션명',
+                        'price': '가격',
+                        'rating': '평점',
+                        'review_count': '리뷰수',
+                        'scrap_count': '스크랩수',
+                        'inquiry_count': '문의수'
+                    }
+                    st.session_state.df = st.session_state.df.rename(columns=column_names)
+                    
+                    # 수집된 데이터 즉시 표시
+                    st.write("수집된 데이터:")
+                    st.dataframe(st.session_state.df, height=400)
+                    
+                    # 시각화 생성 및 표시
+                    st.session_state.fig_price = create_visualizations(st.session_state.df)
+                    st.plotly_chart(st.session_state.fig_price)
+                    
+                    # AI 분석 시작
+                    with st.spinner('AI 분석을 수행중입니다...'):
+                        analysis_result = analyze_with_openai(st.session_state.df)
+                        st.session_state.analysis_text = analysis_result
+                        
+                        # AI 분석 결과 표시
+                        st.subheader("AI 분석 결과")
+                        st.write(analysis_result)
+                
+        except Exception as e:
+            st.error(f"스크래핑 중 오류가 발생했습니다: {str(e)}")
+            # 임시 저장된 데이터 확인
+            if 'temp_df' in st.session_state:
+                st.warning("부분적으로 수집된 데이터를 표시합니다.")
+                st.session_state.df = st.session_state.temp_df
 
     # 초기화 버튼
     if st.session_state.df is not None:
