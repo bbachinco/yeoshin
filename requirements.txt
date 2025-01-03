@@ -18,6 +18,7 @@ MarkupSafe==3.0.2
 mdurl==0.1.2
 narwhals==1.19.0
 numpy>=1.19.3,<2
+openai>=1.0.0
 openpyxl==3.1.2
 packaging>=16.8,<24
 pandas>=2.1.0
