@@ -733,122 +733,6 @@ def analyze_with_openai(df):
         st.error(f"전체 프로세스 실패: {str(e)}")
         return "분석을 수행할 수 없습니다."
 
-def generate_pdf(df, analysis_text, fig_price, fig_dist):
-    try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        
-        # 나눔고딕 폰트 경로 수정 (깃허브 루트 디렉토리)
-        FONT_PATH = "NanumGothic.ttf"
-        try:
-            pdfmetrics.registerFont(TTFont('NanumGothic', FONT_PATH))
-            registerFontFamily('NanumGothic', normal='NanumGothic')
-            font_name = 'NanumGothic'
-        except Exception as e:
-            st.warning(f"폰트 로딩 실패: {str(e)}. 기본 폰트를 사용합니다.")
-            font_name = 'Helvetica'
-        
-        # 한글 지원 스타일 생성
-        styles = getSampleStyleSheet()
-        styles.add(ParagraphStyle(
-            name='KoreanNormal',
-            fontName=font_name,
-            fontSize=10,
-            leading=12
-        ))
-        styles.add(ParagraphStyle(
-            name='KoreanHeading1',
-            fontName=font_name,
-            fontSize=16,
-            leading=20,
-            spaceAfter=30
-        ))
-        
-        # PDF에 들어갈 요소들을 담을 리스트
-        elements = []
-        
-        # 제목 추가
-        elements.append(Paragraph('스크래핑 데이터', styles['KoreanHeading1']))
-        elements.append(Spacer(1, 20))
-        
-        # 데이터 테이블 생성
-        col_names = {
-            'hospital_name': '병원명',
-            'location': '치',
-            'event_name': '이벤트명',
-            'option_name': '옵션명',
-            'price': '가격',
-            'rating': '평점',
-            'review_count': '리뷰수',
-            'scrap_count': '스크랩수',
-            'inquiry_count': '문의수'
-        }
-        
-        # 테이블 데이터 준비
-        table_data = [[col_names[col] for col in col_names.keys()]]
-        
-        for _, row in df.iterrows():
-            table_row = []
-            for col in col_names.keys():
-                try:
-                    value = row[col] if pd.notna(row[col]) else "N/A"
-                    table_row.append(str(value)[:20])
-                except KeyError:
-                    table_row.append('N/A')
-            table_data.append(table_row)
-        
-        # 테이블 스타일 설정
-        table_style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), font_name),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), font_name),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ])
-        
-# 테이블 생성 및 스타일 적
-        table = Table(table_data, repeatRows=1)
-        table.setStyle(table_style)
-        elements.append(table)
-        
-        try:
-            # 시각화 섹션 제목
-            elements.append(Spacer(1, 30))
-            elements.append(Paragraph('데이터 시각화', styles['KoreanHeading1']))
-            
-            # 그프 이미지 저장 및 추가
-            fig_price.write_image("price_plot.png")
-            fig_dist.write_image("dist_plot.png")
-            
-            elements.append(Image("price_plot.png", width=500, height=300))
-            elements.append(Spacer(1, 30))
-            elements.append(Image("dist_plot.png", width=500, height=300))
-        except Exception as e:
-            elements.append(Paragraph(f'그래프 생성 중 오류 발생: {str(e)}', styles['KoreanNormal']))
-        
-        # 분석 리포트 섹션
-        elements.append(Spacer(1, 30))
-        elements.append(Paragraph('분석 리포트', styles['KoreanHeading1']))
-        elements.append(Paragraph(analysis_text, styles['KoreanNormal']))
-        
-        # PDF 생성
-        doc.build(elements)
-        pdf_bytes = buffer.getvalue()
-        buffer.close()
-        return pdf_bytes
-        
-    except Exception as e:
-        st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
-        return None
-
 def main():
     st.title("여신티켓 데이터 스크래퍼")
     
@@ -866,14 +750,15 @@ def main():
         progress_bar = st.progress(0)
         scraper = YeoshinScraper()
         
+        # 데이터 수집
         with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
             st.session_state.df = scraper.scrape_data(keyword, progress_bar)
             
-        # 먼저 영문 컬럼명으로 데이터 검증
+        # 먼이터 검증 및 표시
         if not st.session_state.df.empty and validate_data(st.session_state.df):
             st.success("데이터 수집이 완료되었습니다!")
             
-            # 검증 후 컬럼명을 한글로 변경
+            # 컬럼명을 한글로 변경
             column_names = {
                 'hospital_name': '병원명',
                 'location': '위치',
@@ -883,47 +768,28 @@ def main():
                 'rating': '평점',
                 'review_count': '리뷰수',
                 'scrap_count': '스크랩수',
-                'inquiry_count': '문의수',
-                'detail_link': '상세링크'
+                'inquiry_count': '문의수'
             }
             st.session_state.df = st.session_state.df.rename(columns=column_names)
             
-            # 시각화
-            st.session_state.fig_price = create_visualizations(st.session_state.df)
+            # 수집된 데이터 즉시 표시
+            st.write("수집된 데이터:")
+            st.dataframe(st.session_state.df, height=400)
             
-            # Claude AI 분석
-            with st.spinner('AI 분석을 수행중입니다...'):
-                st.session_state.analysis_text = analyze_with_openai(st.session_state.df)
-    
-    # 저장된 데이터가 있으면 표시
-    if st.session_state.df is not None:
-        st.write("수집된 데이터:")
-        st.dataframe(st.session_state.df, height=400)
-        
-        if st.session_state.fig_price is not None:
+            # 시각화 생성 및 표시
+            st.session_state.fig_price = create_visualizations(st.session_state.df)
             st.plotly_chart(st.session_state.fig_price)
-        
-        if st.session_state.analysis_text is not None:
-            try:
-                pdf_bytes = generate_pdf(
-                    st.session_state.df, 
-                    st.session_state.analysis_text, 
-                    st.session_state.fig_price, 
-                    None
-                )
-                if pdf_bytes:
-                    st.download_button(
-                        label="PDF 보고서 다운로드",
-                        data=pdf_bytes,
-                        file_name=f"yeoshin_{keyword}_report.pdf",
-                        mime="application/pdf"
-                    )
-                else:
-                    st.error("PDF 생성에 실패했습니다.")
-            except Exception as e:
-                st.error(f"PDF 처리 중 오류가 발생했습니다: {str(e)}")
+            
+            # AI 분석 시작
+            with st.spinner('AI 분석을 수행중입니다...'):
+                analysis_result = analyze_with_openai(st.session_state.df)
+                st.session_state.analysis_text = analysis_result
+                
+                # AI 분석 결과 표시
+                st.subheader("AI 분석 결과")
+                st.write(analysis_result)
 
-    # 초기화 버튼 추가
+    # 초기화 버튼
     if st.session_state.df is not None:
         if st.button("새로운 검색 시작"):
             st.session_state.df = None
