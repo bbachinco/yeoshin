@@ -240,7 +240,7 @@ class YeoshinScraper:
             self.wait_for_page_load()
             progress_bar.progress(0.2)
             
-            time.sleep(5)
+            time.sleep(2)
             self.scroll_to_load_all()
             progress_bar.progress(0.3)
             
@@ -530,7 +530,7 @@ class YeoshinScraper:
                 raise Exception("로그인 상태 확인 실패")
             
             self.search_keyword(keyword, progress_bar)
-            time.sleep(5)
+            time.sleep(2)
             self.scroll_to_load_all()
 
             # 검색 결과 리스트 컨테이너 찾기
@@ -600,7 +600,7 @@ class YeoshinScraper:
                         # click() 메서드 직접 사용
                         event = self.page.locator(event_selector)
                         event.click()
-                        time.sleep(3)
+                        time.sleep(1)
                         self.logger.info(f"{idx}번째 이벤트 클릭 성공")
                         
                         # 이벤트 상세 정보 수집
@@ -612,7 +612,7 @@ class YeoshinScraper:
                         # 검색 결과 페이지로 돌아가기
                         self.page.goto(current_url)
                         self.wait_for_page_load()
-                        time.sleep(2)
+                        time.sleep(1)
                         
                     except Exception as e:
                         self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
