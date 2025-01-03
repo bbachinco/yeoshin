@@ -844,6 +844,14 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
 def main():
     st.title("여신티켓 데이터 스크래퍼")
     
+    # 세션 상태 초기화
+    if 'df' not in st.session_state:
+        st.session_state.df = None
+    if 'analysis_text' not in st.session_state:
+        st.session_state.analysis_text = None
+    if 'fig_price' not in st.session_state:
+        st.session_state.fig_price = None
+    
     keyword = st.text_input("검색할 키워드를 입력하세요:")
     
     if st.button("스크래핑 시작"):
@@ -851,13 +859,13 @@ def main():
         scraper = YeoshinScraper()
         
         with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
-            df = scraper.scrape_data(keyword, progress_bar)
+            st.session_state.df = scraper.scrape_data(keyword, progress_bar)
             
         # 먼저 영문 컬럼명으로 데이터 검증
-        if not df.empty and validate_data(df):
+        if not st.session_state.df.empty and validate_data(st.session_state.df):
             st.success("데이터 수집이 완료되었습니다!")
             
-            # 검증 후 컬명을 한글로 경
+            # 검증 후 컬럼명을 한글로 변경
             column_names = {
                 'hospital_name': '병원명',
                 'location': '위치',
@@ -870,25 +878,34 @@ def main():
                 'inquiry_count': '문의수',
                 'detail_link': '상세링크'
             }
-            df = df.rename(columns=column_names)
-            
-            # 데이터프레임을 크롤 가능한 컨테이너에 표시
-            st.write("수집된 데이터:")
-            st.dataframe(df, height=400)
+            st.session_state.df = st.session_state.df.rename(columns=column_names)
             
             # 시각화
-            fig_price = create_visualizations(df)
-            st.plotly_chart(fig_price)
+            st.session_state.fig_price = create_visualizations(st.session_state.df)
             
             # Claude AI 분석
-            with st.spinner('AI 분석을 수행입다...'):
-                analysis_text = analyze_with_claude(df)
-            
+            with st.spinner('AI 분석을 수행중입니다...'):
+                st.session_state.analysis_text = analyze_with_claude(st.session_state.df)
+    
+    # 저장된 데이터가 있으면 표시
+    if st.session_state.df is not None:
+        st.write("수집된 데이터:")
+        st.dataframe(st.session_state.df, height=400)
+        
+        if st.session_state.fig_price is not None:
+            st.plotly_chart(st.session_state.fig_price)
+        
+        if st.session_state.analysis_text is not None:
             try:
-                pdf_bytes = generate_pdf(df, analysis_text, fig_price, None)
+                pdf_bytes = generate_pdf(
+                    st.session_state.df, 
+                    st.session_state.analysis_text, 
+                    st.session_state.fig_price, 
+                    None
+                )
                 if pdf_bytes:
                     st.download_button(
-                        label="PDF 보기서 다운로드",
+                        label="PDF 보고서 다운로드",
                         data=pdf_bytes,
                         file_name=f"yeoshin_{keyword}_report.pdf",
                         mime="application/pdf"
@@ -897,8 +914,14 @@ def main():
                     st.error("PDF 생성에 실패했습니다.")
             except Exception as e:
                 st.error(f"PDF 처리 중 오류가 발생했습니다: {str(e)}")
-        else:
-            st.warning("검색 결과가 없거나 데이터 형식 올바르지 않습니다. 다른 키워드로 시도보세요.")
+
+    # 초기화 버튼 추가
+    if st.session_state.df is not None:
+        if st.button("새로운 검색 시작"):
+            st.session_state.df = None
+            st.session_state.analysis_text = None
+            st.session_state.fig_price = None
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
