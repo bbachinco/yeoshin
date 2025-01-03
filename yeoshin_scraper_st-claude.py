@@ -238,7 +238,7 @@ class YeoshinScraper:
             self.wait_for_page_load()
             progress_bar.progress(0.2)
             
-            time.sleep(5)
+            time.sleep(2)
             self.scroll_to_load_all()
             progress_bar.progress(0.3)
             
@@ -588,13 +588,14 @@ class YeoshinScraper:
                     
                     event = self.page.locator(event_selector)
                     event.click()
-                    time.sleep(2)  # 기존 3초에서 2초로 감소
+                    time.sleep(1)
+                    self.logger.info(f"{idx}번째 이벤트 클릭 성공")
                     
                     item_data = self.get_event_details(None, progress_value, progress_bar)
                     
                     self.page.goto(current_url)
                     self.wait_for_page_load()
-                    time.sleep(1)  # 기존 2초에서 1초로 감소
+                    time.sleep(1)
                     
                     return item_data
                     
