@@ -8,8 +8,6 @@ import re
 from dotenv import load_dotenv
 import tempfile
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
 
 # Anthropic 관련
 from anthropic import Anthropic
@@ -202,22 +200,26 @@ class YeoshinScraper:
             self.logger.error(f"Playwright setup error: {str(e)}")
             raise e
 
-    def wait_for_page_load(self, timeout=15000):
+    def wait_for_page_load(self, timeout=30000):
         """페이지 로딩 대기"""
         try:
             self.page.wait_for_load_state("networkidle", timeout=timeout)
-            self.page.wait_for_timeout(2000)
+            self.page.wait_for_timeout(5000)
         except PlaywrightTimeoutError:
             self.logger.warning("페이지 로딩 시간 초과")
 
     def scroll_to_load_all(self):
         """전체 페이지 스크롤"""
-        for _ in range(3):
+        for _ in range(5):
             try:
+                # 현재 높이 저장
                 previous_height = self.page.evaluate("document.body.scrollHeight")
-                self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                self.page.wait_for_timeout(1500)
                 
+                # 스크롤 수행
+                self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                self.page.wait_for_timeout(3000)
+                
+                # 새로운 컨텐츠가 로드되었는지 확인
                 current_height = self.page.evaluate("document.body.scrollHeight")
                 if current_height == previous_height:
                     break
@@ -238,7 +240,7 @@ class YeoshinScraper:
             self.wait_for_page_load()
             progress_bar.progress(0.2)
             
-            time.sleep(2)
+            time.sleep(5)
             self.scroll_to_load_all()
             progress_bar.progress(0.3)
             
@@ -528,7 +530,9 @@ class YeoshinScraper:
                 raise Exception("로그인 상태 확인 실패")
             
             self.search_keyword(keyword, progress_bar)
-            
+            time.sleep(5)
+            self.scroll_to_load_all()
+
             # 검색 결과 리스트 컨테이너 찾기
             list_container_selectors = [
                 '//*[@id="ct-view"]/div/main/article/section[2]/section',
@@ -573,50 +577,55 @@ class YeoshinScraper:
             else:
                 st.info(f"총 {total_items}개의 이벤트가 검색되었습니다.")
 
-            # 병렬 처리를 위한 함수
-            def process_single_event(idx):
+            # 모든 이벤트의 데이터를 저장할 리스트
+            all_events_data = []
+            
+            # 각 이벤트마다 상세 정보 수집 (최대 MAX_ITEMS개까지만)
+            for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
                 try:
                     self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
                     progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
                     
+                    # 현재 URL 저장
                     current_url = self.page.url
+                    self.logger.info(f"현재 URL: {current_url}")
                     
+                    # 이벤트 요소 찾기 및 클릭
                     event_selector = (
                         f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
                         else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
                     )
                     
-                    event = self.page.locator(event_selector)
-                    event.click()
-                    time.sleep(1)
-                    self.logger.info(f"{idx}번째 이벤트 클릭 성공")
+                    try:
+                        # click() 메서드 직접 사용
+                        event = self.page.locator(event_selector)
+                        event.click()
+                        time.sleep(3)
+                        self.logger.info(f"{idx}번째 이벤트 클릭 성공")
+                        
+                        # 이벤트 상세 정보 수집
+                        item_data = self.get_event_details(None, progress_value, progress_bar)
+                        if item_data:
+                            all_events_data.extend(item_data)
+                            self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
+                        
+                        # 검색 결과 페이지로 돌아가기
+                        self.page.goto(current_url)
+                        self.wait_for_page_load()
+                        time.sleep(2)
+                        
+                    except Exception as e:
+                        self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
+                        continue
                     
-                    item_data = self.get_event_details(None, progress_value, progress_bar)
-                    
-                    self.page.goto(current_url)
-                    self.wait_for_page_load()
-                    time.sleep(1)
-                    
-                    return item_data
+                    progress_bar.progress(progress_value)
                     
                 except Exception as e:
-                    self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
-                    return None
+                    self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
+                    continue
 
-            # ThreadPoolExecutor를 사용한 병렬 처리
-            all_events_data = []
-            with ThreadPoolExecutor(max_workers=3) as executor:  # 동시에 3개의 이벤트 처리
-                futures = [executor.submit(process_single_event, idx) 
-                          for idx in range(1, min(total_items + 1, MAX_ITEMS + 1))]
-                
-                for future in futures:
-                    result = future.result()
-                    if result:
-                        if isinstance(result, list):
-                            all_events_data.extend(result)
-                        else:
-                            all_events_data.append(result)
-
+            self.logger.info(f"\n=== 전체 {total_items}개 중 {len(all_events_data)}개 이벤트 데이터 수집 완료 ===")
+            
             return pd.DataFrame(all_events_data)
                 
         except Exception as e:
@@ -852,47 +861,25 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
         return None
 
-# 데이터 수집 및 처리 로직을 async로 변경
-async def process_data(keyword):
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            context = await browser.new_context()
-            page = await context.new_page()
-            
-            # 데이터 수집 로직
-            df = await collect_data(page, keyword)
-            
-            await page.close()
-            await context.close()
-            await browser.close()
-            
-            return df
-            
-    except Exception as e:
-        logging.error(f"데이터 수집 중 오류 발생: {str(e)}")
-        return None
-
 def main():
-    # session_state 초기화
+    st.title("여신티켓 데이터 스크래퍼")
+    
+    # 세션 상태 초기화
     if 'df' not in st.session_state:
         st.session_state.df = None
     if 'analysis_text' not in st.session_state:
         st.session_state.analysis_text = None
     if 'fig_price' not in st.session_state:
         st.session_state.fig_price = None
-
-    st.title("여신티켓 이벤트 수집기")
     
-    keyword = st.text_input("검색어를 입력하세요:")
+    keyword = st.text_input("검색할 키워드를 입력하세요:")
     
-    if st.button("검색 시작") and keyword:
-        with st.spinner('데이터를 수집하는 중입니다...'):
-            # 비동기 함수 실행을 위한 이벤트 루프 생성
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            st.session_state.df = loop.run_until_complete(process_data(keyword))
-            loop.close()
+    if st.button("스크래핑 시작"):
+        progress_bar = st.progress(0)
+        scraper = YeoshinScraper()
+        
+        with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
+            st.session_state.df = scraper.scrape_data(keyword, progress_bar)
             
         # 먼저 영문 컬럼명으로 데이터 검증
         if not st.session_state.df.empty and validate_data(st.session_state.df):
