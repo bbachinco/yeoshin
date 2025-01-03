@@ -532,11 +532,8 @@ class YeoshinScraper:
             if not container:
                 raise Exception("검색 결과 리스트 컨테이너를 찾을 수 없습니다")
             
-            # 데이터를 청크 단위로 처리
-            CHUNK_SIZE = 20  # 한 번에 처리할 이벤트 수
-            all_events_data = []
-            current_chunk = []
-            
+            # 컨테이너 내의 모든 이벤트 항목 찾기 (div[n]/article 패턴 사용)
+            events = []
             idx = 1
             while True:
                 try:
@@ -544,66 +541,66 @@ class YeoshinScraper:
                         f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
                         else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
                     )
-                    
-                    try:
-                        event = self.page.wait_for_selector(event_selector, timeout=5000)
-                        if not event:
-                            self.logger.info(f"더 이상의 이벤트가 없습니다. 총 {idx-1}개의 이벤트를 찾았습니다.")
-                            break
-                    except PlaywrightTimeoutError:
-                        self.logger.info(f"더 이상의 이벤트가 없습니다. 총 {idx-1}개의 이벤트를 찾았습니다.")
-                        break
-                    
-                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ===")
-                    progress_value = min(0.3 + (0.7 * (idx / 100)), 0.99)  # 진행률 계산 수정
+                    event = self.page.wait_for_selector(event_selector, timeout=10000)
+                    events.append(event)
+                    self.logger.info(f"{idx}번째 이벤트 요소 찾기 성공")
+                    idx += 1
+                except Exception as e:
+                    break
+            
+            total_items = len(events)
+            self.logger.info(f"총 {total_items}개의 이벤트를 찾았습니다")
+            
+            # 모든 이벤트의 데이터를 저장할 리스트
+            all_events_data = []
+            
+            # 각 이벤트마다 상세 정보 수집
+            for idx in range(1, total_items + 1):
+                try:
+                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{total_items}) ===")
+                    progress_value = 0.3 + (0.7 * (idx / total_items))
                     
                     # 현재 URL 저장
                     current_url = self.page.url
+                    self.logger.info(f"현재 URL: {current_url}")
+                    
+                    # 이벤트 요소 찾기 및 클릭
+                    event_selector = (
+                        f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
+                        else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
+                    )
                     
                     try:
+                        # click() 메서드 직접 사용
                         event = self.page.locator(event_selector)
                         event.click()
-                        time.sleep(2)
+                        time.sleep(3)
+                        self.logger.info(f"{idx}번째 이벤트 클릭 성공")
                         
+                        # 이벤트 상세 정보 수집
                         item_data = self.get_event_details(None, progress_value, progress_bar)
                         if item_data:
-                            current_chunk.extend(item_data)
+                            all_events_data.extend(item_data)
                             self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
                         
                         # 검색 결과 페이지로 돌아가기
                         self.page.goto(current_url)
                         self.wait_for_page_load()
-                        time.sleep(1)
+                        time.sleep(2)
                         
                     except Exception as e:
                         self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
                         continue
                     
-                    # 청크 단위로 데이터 처리
-                    if len(current_chunk) >= CHUNK_SIZE:
-                        all_events_data.extend(current_chunk)
-                        # 중간 결과를 DataFrame으로 변환하여 표시
-                        temp_df = pd.DataFrame(all_events_data)
-                        st.session_state['current_results'] = temp_df
-                        st.experimental_rerun()  # 화면 갱신
-                        current_chunk = []
-                    
                     progress_bar.progress(progress_value)
-                    idx += 1
                     
                 except Exception as e:
-                    self.logger.error(f"이벤트 처리 중 오류 발생: {str(e)}")
-                    break
+                    self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
+                    continue
+
+            self.logger.info(f"\n=== 전체 {total_items}개 중 {len(all_events_data)}개 이벤트 데이터 수집 완료 ===")
             
-            # 남은 데이터 처리
-            if current_chunk:
-                all_events_data.extend(current_chunk)
-            
-            final_df = pd.DataFrame(all_events_data)
-            st.session_state['current_results'] = final_df
-            
-            self.logger.info(f"\n=== 전체 {idx-1}개 중 {len(all_events_data)}개 이벤트 데이터 수집 완료 ===")
-            return final_df
+            return pd.DataFrame(all_events_data)
                 
         except Exception as e:
             self.logger.error(f"스크래핑 중 오류 발생: {str(e)}")
@@ -841,10 +838,6 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
 def main():
     st.title("여신티켓 데이터 스크래퍼")
     
-    # 세션 상태 초기화
-    if 'current_results' not in st.session_state:
-        st.session_state['current_results'] = None
-    
     keyword = st.text_input("검색할 키워드를 입력하세요:")
     
     if st.button("스크래핑 시작"):
@@ -854,28 +847,52 @@ def main():
         with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
             df = scraper.scrape_data(keyword, progress_bar)
             
-            # 결과 표시
-            if not df.empty:
-                st.success("데이터 수집이 완료되었습니다!")
-                
-                # 컬럼명을 한글로 변경
-                column_names = {
-                    'hospital_name': '병원명',
-                    'location': '위치',
-                    'event_name': '이벤트명',
-                    'option_name': '옵션명',
-                    'price': '가격',
-                    'rating': '평점',
-                    'review_count': '리뷰수',
-                    'scrap_count': '스크랩수',
-                    'inquiry_count': '문의수'
-                }
-                df = df.rename(columns=column_names)
-                
-                st.write("수집된 데이터:")
-                st.dataframe(df, height=400)
-            else:
-                st.warning("검색 결과가 없거나 데이터 형식이 올바르지 않습니다. 다른 키워드로 시도해보세요.")
+        # 먼저 영문 컬럼명으로 데이터 검증
+        if not df.empty and validate_data(df):
+            st.success("데이터 수집이 완료되었습니다!")
+            
+            # 검증 후 컬명을 한글로 경
+            column_names = {
+                'hospital_name': '병원명',
+                'location': '위치',
+                'event_name': '이벤트명',
+                'option_name': '옵션명',
+                'price': '가격',
+                'rating': '평점',
+                'review_count': '리뷰수',
+                'scrap_count': '스크랩수',
+                'inquiry_count': '문의수',
+                'detail_link': '상세링크'
+            }
+            df = df.rename(columns=column_names)
+            
+            # 데이터프레임을 크롤 가능한 컨테이너에 표시
+            st.write("수집된 데이터:")
+            st.dataframe(df, height=400)
+            
+            # 시각화
+            fig_price = create_visualizations(df)
+            st.plotly_chart(fig_price)
+            
+            # Claude AI 분석
+            with st.spinner('AI 분석을 수행입다...'):
+                analysis_text = analyze_with_claude(df)
+            
+            try:
+                pdf_bytes = generate_pdf(df, analysis_text, fig_price, None)
+                if pdf_bytes:
+                    st.download_button(
+                        label="PDF 보기서 다운로드",
+                        data=pdf_bytes,
+                        file_name=f"yeoshin_{keyword}_report.pdf",
+                        mime="application/pdf"
+                    )
+                else:
+                    st.error("PDF 생성에 실패했습니다.")
+            except Exception as e:
+                st.error(f"PDF 처리 중 오류가 발생했습니다: {str(e)}")
+        else:
+            st.warning("검색 결과가 없거나 데이터 형식 올바르지 않습니다. 다른 키워드로 시도보세요.")
 
 if __name__ == "__main__":
     main()
