@@ -8,6 +8,8 @@ import re
 from dotenv import load_dotenv
 import tempfile
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 # Anthropic 관련
 from anthropic import Anthropic
@@ -530,9 +532,7 @@ class YeoshinScraper:
                 raise Exception("로그인 상태 확인 실패")
             
             self.search_keyword(keyword, progress_bar)
-            time.sleep(5)
-            self.scroll_to_load_all()
-
+            
             # 검색 결과 리스트 컨테이너 찾기
             list_container_selectors = [
                 '//*[@id="ct-view"]/div/main/article/section[2]/section',
@@ -577,55 +577,49 @@ class YeoshinScraper:
             else:
                 st.info(f"총 {total_items}개의 이벤트가 검색되었습니다.")
 
-            # 모든 이벤트의 데이터를 저장할 리스트
-            all_events_data = []
-            
-            # 각 이벤트마다 상세 정보 수집 (최대 MAX_ITEMS개까지만)
-            for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
+            # 병렬 처리를 위한 함수
+            def process_single_event(idx):
                 try:
                     self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
                     progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
                     
-                    # 현재 URL 저장
                     current_url = self.page.url
-                    self.logger.info(f"현재 URL: {current_url}")
                     
-                    # 이벤트 요소 찾기 및 클릭
                     event_selector = (
                         f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
                         else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
                     )
                     
-                    try:
-                        # click() 메서드 직접 사용
-                        event = self.page.locator(event_selector)
-                        event.click()
-                        time.sleep(3)
-                        self.logger.info(f"{idx}번째 이벤트 클릭 성공")
-                        
-                        # 이벤트 상세 정보 수집
-                        item_data = self.get_event_details(None, progress_value, progress_bar)
-                        if item_data:
-                            all_events_data.extend(item_data)
-                            self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
-                        
-                        # 검색 결과 페이지로 돌아가기
-                        self.page.goto(current_url)
-                        self.wait_for_page_load()
-                        time.sleep(2)
-                        
-                    except Exception as e:
-                        self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
-                        continue
+                    event = self.page.locator(event_selector)
+                    event.click()
+                    time.sleep(2)  # 기존 3초에서 2초로 감소
                     
-                    progress_bar.progress(progress_value)
+                    item_data = self.get_event_details(None, progress_value, progress_bar)
+                    
+                    self.page.goto(current_url)
+                    self.wait_for_page_load()
+                    time.sleep(1)  # 기존 2초에서 1초로 감소
+                    
+                    return item_data
                     
                 except Exception as e:
-                    self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
-                    continue
+                    self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
+                    return None
 
-            self.logger.info(f"\n=== 전체 {total_items}개 중 {len(all_events_data)}개 이벤트 데이터 수집 완료 ===")
-            
+            # ThreadPoolExecutor를 사용한 병렬 처리
+            all_events_data = []
+            with ThreadPoolExecutor(max_workers=3) as executor:  # 동시에 3개의 이벤트 처리
+                futures = [executor.submit(process_single_event, idx) 
+                          for idx in range(1, min(total_items + 1, MAX_ITEMS + 1))]
+                
+                for future in futures:
+                    result = future.result()
+                    if result:
+                        if isinstance(result, list):
+                            all_events_data.extend(result)
+                        else:
+                            all_events_data.append(result)
+
             return pd.DataFrame(all_events_data)
                 
         except Exception as e:
