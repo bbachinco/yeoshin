@@ -9,9 +9,6 @@ from dotenv import load_dotenv
 import tempfile
 import subprocess
 
-# Anthropic 관련
-from anthropic import Anthropic
-
 # Playwright 관련
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
@@ -30,6 +27,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Image, Spac
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
+
+# OpenAI import 추가
+from openai import OpenAI
 
 # 환경 변수 로드
 load_dotenv()
@@ -677,65 +677,54 @@ def validate_data(df):
         return False
     return True
 
-def analyze_with_claude(df):
+def analyze_with_openai(df):
     try:
-        # 1. API 키 확인 - 직접 ANTHROPIC_API_KEY로 설정
+        # 1. API 키 확인
         try:
-            api_key = st.secrets.env.CLAUDE_API_KEY
-            os.environ["ANTHROPIC_API_KEY"] = api_key  # Anthropic이 사용하는 환경 변수명으로 설정
+            api_key = st.secrets.env.OPENAI_API_KEY
+            client = OpenAI(api_key=api_key)
             st.write("1. API 키 상태:", "있음" if api_key else "없음")
         except Exception as e:
             st.error(f"API 키를 찾을 수 없습니다: {str(e)}")
             return "API 키 없음"
-        
-        # 2. Anthropic 객체 생성 - 인자 없이 생성
-        try:
-            client = Anthropic()  # API 키는 환경 변수에서 자동으로 가져감
-            st.write("2. Anthropic 객체 생성 성공")
-        except Exception as e:
-            st.error(f"2. Anthropic 객체 생성 실패: {str(e)}")
-            st.error(f"에러 타입: {type(e)}")
-            st.error(f"에러 내용: {str(e)}")
-            return "Anthropic 객체 생성 실패"
 
-        # 3. 데이터 전처리
+        # 2. 데이터 전처리
         try:
             analysis_data = df.copy()
             analysis_data['exposure_order'] = analysis_data.index + 1
-            st.write("3. 데이터 전처리 성공")
+            st.write("2. 데이터 전처리 성공")
         except Exception as e:
-            st.error(f"3. 데이터 전처리 실패: {str(e)}")
+            st.error(f"2. 데이터 전처리 실패: {str(e)}")
             return "데이터 전처리 실패"
 
-        # 4. API 호출
+        # 3. API 호출
         try:
-            response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2500,
-                temperature=0,
+            response = client.chat.completions.create(
+                model="gpt-4",
                 messages=[{
                     "role": "user",
-                    "content": f"""여신티켓의 시술 이벤트 데이터를 분석하여, 새로운 이벤트를 등록하려는 원에 도움이 될 만한 인사이트를 제공해주세요.
+                    "content": f"""여신티켓의 시술 이벤트 데이터를 분석하여, 새로운 이벤트를 등록하려는 병원에 도움이 될 만한 인사이트를 제공해주세요.
                     
                     데이터:
                     {analysis_data.to_string()}
                     """
-                }]
+                }],
+                temperature=0
             )
-            st.write("4. API 호출 성공")
+            st.write("3. API 호출 성공")
         except Exception as e:
-            st.error(f"4. API 호출 실패: {str(e)}")
+            st.error(f"3. API 호출 실패: {str(e)}")
             return "API 호출 실패"
 
-        # 5. 응답 처리
+        # 4. 응답 처리
         try:
-            content = response.content
+            content = response.choices[0].message.content
             if not content:
-                st.error("5. 응답이 비어있습니다")
+                st.error("4. 응답이 비어있습니다")
                 return "응답이 비어있습니다"
-            st.write("5. 응답 처리 성공")
+            st.write("4. 응답 처리 성공")
         except Exception as e:
-            st.error(f"5. 응답 처리 실패: {str(e)}")
+            st.error(f"4. 응답 처리 실패: {str(e)}")
             return "응답 처리 실패"
 
         return content
@@ -743,7 +732,6 @@ def analyze_with_claude(df):
     except Exception as e:
         st.error(f"전체 프로세스 실패: {str(e)}")
         return "분석을 수행할 수 없습니다."
-
 
 def generate_pdf(df, analysis_text, fig_price, fig_dist):
     try:
@@ -905,7 +893,7 @@ def main():
             
             # Claude AI 분석
             with st.spinner('AI 분석을 수행중입니다...'):
-                st.session_state.analysis_text = analyze_with_claude(st.session_state.df)
+                st.session_state.analysis_text = analyze_with_openai(st.session_state.df)
     
     # 저장된 데이터가 있으면 표시
     if st.session_state.df is not None:
