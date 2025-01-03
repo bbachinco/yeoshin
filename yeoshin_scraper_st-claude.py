@@ -851,25 +851,39 @@ def generate_pdf(df, analysis_text, fig_price, fig_dist):
         st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
         return None
 
+# 데이터 수집 및 처리 로직을 async로 변경
+async def process_data(keyword):
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            context = await browser.new_context()
+            page = await context.new_page()
+            
+            # 데이터 수집 로직
+            df = await collect_data(page, keyword)
+            
+            await page.close()
+            await context.close()
+            await browser.close()
+            
+            return df
+            
+    except Exception as e:
+        logging.error(f"데이터 수집 중 오류 발생: {str(e)}")
+        return None
+
 def main():
-    st.title("여신티켓 데이터 스크래퍼")
+    st.title("여신티켓 이벤트 수집기")
     
-    # 세션 상태 초기화
-    if 'df' not in st.session_state:
-        st.session_state.df = None
-    if 'analysis_text' not in st.session_state:
-        st.session_state.analysis_text = None
-    if 'fig_price' not in st.session_state:
-        st.session_state.fig_price = None
+    keyword = st.text_input("검색어를 입력하세요:")
     
-    keyword = st.text_input("검색할 키워드를 입력하세요:")
-    
-    if st.button("스크래핑 시작"):
-        progress_bar = st.progress(0)
-        scraper = YeoshinScraper()
-        
-        with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
-            st.session_state.df = scraper.scrape_data(keyword, progress_bar)
+    if st.button("검색 시작") and keyword:
+        with st.spinner('데이터를 수집하는 중입니다...'):
+            # 비동기 함수 실행을 위한 이벤트 루프 생성
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            st.session_state.df = loop.run_until_complete(process_data(keyword))
+            loop.close()
             
         # 먼저 영문 컬럼명으로 데이터 검증
         if not st.session_state.df.empty and validate_data(st.session_state.df):
