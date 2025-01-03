@@ -581,15 +581,17 @@ class YeoshinScraper:
             all_events_data = []
             
             try:
-                # 각 이벤트마다 상세 정보 수집 (최대 MAX_ITEMS개까지만)
+                # 검색 URL 저장
+                search_url = f"https://www.yeoshin.co.kr/search/category?q={keyword}&tab=events"
+                
                 for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
                     try:
                         self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
                         progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
                         
-                        # 현재 URL 저장
-                        current_url = self.page.url
-                        self.logger.info(f"현재 URL: {current_url}")
+                        # 매 이벤트 처리 전 검색 결과 페이지로 돌아가기
+                        self.page.goto(search_url)
+                        self.wait_for_page_load()
                         
                         # 이벤트 요소 찾기 및 클릭
                         event_selector = (
@@ -598,7 +600,6 @@ class YeoshinScraper:
                         )
                         
                         try:
-                            # click() 메서드 직접 사용
                             event = self.page.locator(event_selector)
                             event.click()
                             time.sleep(1)
@@ -610,10 +611,10 @@ class YeoshinScraper:
                                 all_events_data.extend(item_data)
                                 self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
                             
-                            # 검색 결과 페이지로 돌아가기 전에 현재 데이터 저장
+                            # 10개 단위로 임시 저장
                             if len(all_events_data) % 10 == 0:
                                 st.session_state.temp_df = pd.DataFrame(all_events_data)
-                            
+                                
                         except Exception as e:
                             self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
                             continue
@@ -628,16 +629,14 @@ class YeoshinScraper:
                 
             except Exception as e:
                 self.logger.error(f"스크래핑 중 오류 발생: {str(e)}")
-                # 부분적으로 수집된 데이터라도 반환
                 if all_events_data:
                     return pd.DataFrame(all_events_data)
                 return pd.DataFrame()
-            
-        finally:
-            # cleanup 전에 수집된 데이터 확인
-            if 'all_events_data' in locals() and all_events_data:
-                st.session_state.final_df = pd.DataFrame(all_events_data)
-            self.cleanup()
+                
+            finally:
+                if 'all_events_data' in locals() and all_events_data:
+                    st.session_state.final_df = pd.DataFrame(all_events_data)
+                self.cleanup()
 
 def create_visualizations(df):
     """데이터 시각화 생성"""
