@@ -677,24 +677,59 @@ def validate_data(df):
         return False
     return True
 
+def preprocess_data_for_analysis(df):
+    """AI 분석을 위한 데이터 전처리"""
+    try:
+        # 1. 통계적 요약 생성
+        summary_stats = {
+            '총 데이터 수': len(df),
+            '평균 가격': df['가격'].apply(lambda x: float(re.sub(r'[^\d.]', '', x)) if isinstance(x, str) else x).mean(),
+            '평균 리뷰수': df['리뷰수'].apply(lambda x: float(re.sub(r'[^\d.]', '', x)) if isinstance(x, str) else x).mean(),
+            '평균 스크랩수': df['스크랩수'].apply(lambda x: float(re.sub(r'[^\d.]', '', x)) if isinstance(x, str) else x).mean(),
+            '평균 문의수': df['문의수'].apply(lambda x: float(re.sub(r'[^\d.]', '', x)) if isinstance(x, str) else x).mean(),
+        }
+        
+        # 2. 지역별 분석
+        location_stats = df.groupby('위치').agg({
+            '병원명': 'count',
+            '가격': lambda x: x.apply(lambda y: float(re.sub(r'[^\d.]', '', str(y)))).mean()
+        }).reset_index()
+        location_stats.columns = ['위치', '병원수', '평균가격']
+        
+        # 3. 상위 성과 병원 추출 (스크랩수 기준)
+        top_hospitals = df.nlargest(5, '스크랩수')[['병원명', '위치', '가격', '스크랩수']]
+        
+        # 4. 이벤트명 키워드 분석
+        keywords = ' '.join(df['이벤트명'].astype(str)).split()
+        keyword_freq = pd.Series(keywords).value_counts().head(10)
+        
+        # 요약 데이터 생성
+        analysis_summary = {
+            'summary_stats': summary_stats,
+            'location_stats': location_stats.to_dict('records'),
+            'top_hospitals': top_hospitals.to_dict('records'),
+            'top_keywords': keyword_freq.to_dict()
+        }
+        
+        return analysis_summary
+        
+    except Exception as e:
+        st.error(f"데이터 전처리 중 오류 발생: {str(e)}")
+        return None
+
 def analyze_with_openai(df):
     try:
         # 1. API 키 확인
         try:
             api_key = st.secrets.env.OPENAI_API_KEY
             client = OpenAI(api_key=api_key)
-            st.write("1. API 키 상태:", "있음" if api_key else "없음")
         except Exception as e:
             st.error(f"API 키를 찾을 수 없습니다: {str(e)}")
             return "API 키 없음"
 
         # 2. 데이터 전처리
-        try:
-            analysis_data = df.copy()
-            analysis_data['exposure_order'] = analysis_data.index + 1
-            st.write("2. 데이터 전처리 성공")
-        except Exception as e:
-            st.error(f"2. 데이터 전처리 실패: {str(e)}")
+        analysis_summary = preprocess_data_for_analysis(df)
+        if not analysis_summary:
             return "데이터 전처리 실패"
 
         # 3. API 호출
@@ -703,72 +738,37 @@ def analyze_with_openai(df):
                 model="gpt-4",
                 messages=[{
                     "role": "system",
-                    "content": "당신은 피부과 마케팅 전문가입니다. 데이터를 기반으로 실질적이고 구체적인 인사이트를 제공해주세요."
+                    "content": "당신은 피부과 마케팅 전문가입니다. 요약된 데이터를 기반으로 실질적이고 구체적인 인사이트를 제공해주세요."
                 },
                 {
                     "role": "user",
-                    "content": f"""다음 여신티켓 데이터를 분석하여 피부과 의사와 마케터들에게 실질적인 인사이트를 제공해주세요:
+                    "content": f"""다음 여신티켓 데이터 요약을 분석하여 인사이트를 제공해주세요:
 
-[입력 데이터]
-- 병원 정보: 병원명, 지역
-- 이벤트 정보: 이벤트명, 시술명, 가격
-- 고객 반응: 스크랩 수, 문의 수, 리뷰 수
-- 경쟁사 현황: 동일 시술의 타 병원 가격과 반응 데이터
+[데이터 요약]
+1. 전체 통계:
+{analysis_summary['summary_stats']}
 
-분석 관점:
-1. 가격-반응 분석
-- 가격대별 고객 반응(스크랩/문의) 분포
-- 지역별 선호 가격대
-- 리뷰 수가 많은 가격대의 특징
+2. 지역별 통계:
+{analysis_summary['location_stats']}
 
-2. 이벤트명 키워드 효과
-- 고객 반응이 높은 키워드 순위
-- 가격대별 효과적인 키워드 조합
-- 지역별 효과적인 키워드 차이
+3. 상위 성과 병원:
+{analysis_summary['top_hospitals']}
 
-3. 시장 경쟁력 분석
-- 시술별 적정 가격 범위
-- 성공적인 병원들의 가격/키워드 전략
-- 지역별 경쟁 강도
-
-데이터:
-{analysis_data.to_string()}
+4. 주요 키워드:
+{analysis_summary['top_keywords']}
 
 다음 형식으로 분석 결과를 제공해주세요:
 1. 핵심 인사이트 (상위 3개)
-   - 각 인사이트별 구체적인 수치와 근거 포함
-
 2. 상세 분석 결과
-   A. 가격-반응 분석
-   B. 이벤트명 키워드 효과
-   C. 시장 경쟁력 분석
-   - 각 분석별 데이터 기반 주요 발견사항
-   - 구체적인 수치와 근거 포함
-
-3. 액션 아이템 제안
-   - 실무에 바로 적용 가능한 구체적인 전략
-   - 가격, 키워드, 지역별 차별화 전략
-"""
+3. 실행 가능한 전략 제안"""
                 }],
                 temperature=0
             )
-            st.write("3. API 호출 성공")
         except Exception as e:
-            st.error(f"3. API 호출 실패: {str(e)}")
+            st.error(f"API 호출 실패: {str(e)}")
             return "API 호출 실패"
 
-        # 4. 응답 처리
-        try:
-            content = response.choices[0].message.content
-            if not content:
-                st.error("4. 응답이 비어있습니다")
-                return "응답이 비어있습니다"
-            st.write("4. 응답 처리 성공")
-        except Exception as e:
-            st.error(f"4. 응답 처리 실패: {str(e)}")
-            return "응답 처리 실패"
-
-        return content
+        return response.choices[0].message.content
 
     except Exception as e:
         st.error(f"전체 프로세스 실패: {str(e)}")
