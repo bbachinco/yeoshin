@@ -523,8 +523,25 @@ class YeoshinScraper:
 
     def scrape_data(self, keyword, progress_bar):
         try:
+            # 메모리 정리를 위한 가비지 컬렉션 추가
+            import gc
+            gc.collect()
+            
             self.cleanup()
             self.setup_driver()
+            
+            # 네트워크 상태 확인
+            try:
+                self.page.goto("https://www.yeoshin.co.kr", timeout=30000)
+            except PlaywrightTimeoutError:
+                raise Exception("네트워크 연결이 불안정합니다. 다시 시도해주세요.")
+            
+            # 메모리 사용량 모니터링
+            import psutil
+            process = psutil.Process()
+            if process.memory_info().rss > 1024 * 1024 * 1024:  # 1GB 이상
+                self.cleanup()
+                raise Exception("메모리 사용량이 너무 높습니다. 다시 시도해주세요.")
             
             if not self.check_login_status():
                 raise Exception("로그인 상태 확인 실패")
@@ -580,49 +597,58 @@ class YeoshinScraper:
             # 모든 이벤트의 데이터를 저장할 리스트
             all_events_data = []
             
-            # 각 이벤트마다 상세 정보 수집 (최대 MAX_ITEMS개까지만)
-            for idx in range(1, min(total_items + 1, MAX_ITEMS + 1)):
-                try:
-                    self.logger.info(f"\n=== {idx}번째 이벤트 처리 시작 ({idx}/{min(total_items, MAX_ITEMS)}) ===")
-                    progress_value = 0.3 + (0.7 * (idx / min(total_items, MAX_ITEMS)))
-                    
-                    # 현재 URL 저장
-                    current_url = self.page.url
-                    self.logger.info(f"현재 URL: {current_url}")
-                    
-                    # 이벤트 요소 찾기 및 클릭
-                    event_selector = (
-                        f"{list_container_selectors[0]}/div[{idx}]/article" if list_container_selectors[0].startswith('/')
-                        else f"{list_container_selectors[1]} > div:nth-child({idx}) > article"
-                    )
-                    
+            # 데이터 처리 시 청크 단위로 처리
+            chunk_size = 10
+            for idx in range(1, min(total_items + 1, MAX_ITEMS + 1), chunk_size):
+                chunk_end = min(idx + chunk_size, min(total_items + 1, MAX_ITEMS + 1))
+                current_chunk = []
+                
+                for item_idx in range(idx, chunk_end):
                     try:
-                        # click() 메서드 직접 사용
-                        event = self.page.locator(event_selector)
-                        event.click()
-                        time.sleep(1)
-                        self.logger.info(f"{idx}번째 이벤트 클릭 성공")
+                        self.logger.info(f"\n=== {item_idx}번째 이벤트 처리 시작 ({item_idx}/{min(total_items, MAX_ITEMS)}) ===")
+                        progress_value = 0.3 + (0.7 * (item_idx / min(total_items, MAX_ITEMS)))
                         
-                        # 이벤트 상세 정보 수집
-                        item_data = self.get_event_details(None, progress_value, progress_bar)
-                        if item_data:
-                            all_events_data.extend(item_data)
-                            self.logger.info(f"{idx}번째 이벤트 데이터 수집 성공")
+                        # 현재 URL 저장
+                        current_url = self.page.url
+                        self.logger.info(f"현재 URL: {current_url}")
                         
-                        # 검색 결과 페이지로 돌아가기
-                        self.page.goto(current_url)
-                        self.wait_for_page_load()
-                        time.sleep(1)
+                        # 이벤트 요소 찾기 및 클릭
+                        event_selector = (
+                            f"{list_container_selectors[0]}/div[{item_idx}]/article" if list_container_selectors[0].startswith('/')
+                            else f"{list_container_selectors[1]} > div:nth-child({item_idx}) > article"
+                        )
+                        
+                        try:
+                            # click() 메서드 직접 사용
+                            event = self.page.locator(event_selector)
+                            event.click()
+                            time.sleep(1)
+                            self.logger.info(f"{item_idx}번째 이벤트 클릭 성공")
+                            
+                            # 이벤트 상세 정보 수집
+                            item_data = self.get_event_details(None, progress_value, progress_bar)
+                            if item_data:
+                                current_chunk.extend(item_data)
+                                self.logger.info(f"{item_idx}번째 이벤트 데이터 수집 성공")
+                            
+                            # 검색 결과 페이지로 돌아가기
+                            self.page.goto(current_url)
+                            self.wait_for_page_load()
+                            time.sleep(1)
+                            
+                        except Exception as e:
+                            self.logger.error(f"{item_idx}번째 이벤트 처리 실패: {str(e)}")
+                            continue
+                        
+                        progress_bar.progress(progress_value)
                         
                     except Exception as e:
-                        self.logger.error(f"{idx}번째 이벤트 처리 실패: {str(e)}")
+                        self.logger.error(f"{item_idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
                         continue
-                    
-                    progress_bar.progress(progress_value)
-                    
-                except Exception as e:
-                    self.logger.error(f"{idx}번째 이벤트 처리 중 오류 발생: {str(e)}")
-                    continue
+                
+                # 청크 단위로 데이터 추가
+                all_events_data.extend(current_chunk)
+                gc.collect()  # 청크 처리 후 메모리 정리
 
             self.logger.info(f"\n=== 전체 {total_items}개 중 {len(all_events_data)}개 이벤트 데이터 수집 완료 ===")
             
@@ -630,7 +656,8 @@ class YeoshinScraper:
                 
         except Exception as e:
             self.logger.error(f"스크래핑 중 오류 발생: {str(e)}")
-            return pd.DataFrame()
+            self.cleanup()
+            raise
         finally:
             self.cleanup()
 
@@ -784,51 +811,63 @@ def main():
         st.session_state.analysis_text = None
     if 'fig_price' not in st.session_state:
         st.session_state.fig_price = None
+    if 'scraping_in_progress' not in st.session_state:
+        st.session_state.scraping_in_progress = False
+    if 'current_progress' not in st.session_state:
+        st.session_state.current_progress = 0
     
     keyword = st.text_input("검색할 키워드를 입력하세요:")
     
     if st.button("스크래핑 시작"):
-        progress_bar = st.progress(0)
-        scraper = YeoshinScraper()
-        
-        # 데이터 수집
-        with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
-            st.session_state.df = scraper.scrape_data(keyword, progress_bar)
+        st.session_state.scraping_in_progress = True
+        try:
+            progress_bar = st.progress(st.session_state.current_progress)
+            scraper = YeoshinScraper()
             
-        # 먼이터 검증 및 표시
-        if not st.session_state.df.empty and validate_data(st.session_state.df):
-            st.success("데이터 수집이 완료되었습니다!")
+            # 데이터 수집
+            with st.spinner('태팀장 : 데이터를 수집중입니다...오래 걸리니까 커피 한 잔 하고 오세요:)'):
+                df = scraper.scrape_data(keyword, progress_bar)
+                st.session_state.df = df
+                st.session_state.current_progress = 1.0
             
-            # 컬럼명을 한글로 변경
-            column_names = {
-                'hospital_name': '병원명',
-                'location': '위치',
-                'event_name': '이벤트명',
-                'option_name': '옵션명',
-                'price': '가격',
-                'rating': '평점',
-                'review_count': '리뷰수',
-                'scrap_count': '스크랩수',
-                'inquiry_count': '문의수'
-            }
-            st.session_state.df = st.session_state.df.rename(columns=column_names)
-            
-            # 수집된 데이터 즉시 표시
-            st.write("수집된 데이터:")
-            st.dataframe(st.session_state.df, height=400)
-            
-            # 시각화 생성 및 표시
-            st.session_state.fig_price = create_visualizations(st.session_state.df)
-            st.plotly_chart(st.session_state.fig_price)
-            
-            # AI 분석 시작
-            with st.spinner('AI 분석을 수행중입니다...'):
-                analysis_result = analyze_with_openai(st.session_state.df)
-                st.session_state.analysis_text = analysis_result
+            # 먼이터 검증 및 표시
+            if not st.session_state.df.empty and validate_data(st.session_state.df):
+                st.success("데이터 수집이 완료되었습니다!")
                 
-                # AI 분석 결과 표시
-                st.subheader("AI 분석 결과")
-                st.write(analysis_result)
+                # 컬럼명을 한글로 변경
+                column_names = {
+                    'hospital_name': '병원명',
+                    'location': '위치',
+                    'event_name': '이벤트명',
+                    'option_name': '옵션명',
+                    'price': '가격',
+                    'rating': '평점',
+                    'review_count': '리뷰수',
+                    'scrap_count': '스크랩수',
+                    'inquiry_count': '문의수'
+                }
+                st.session_state.df = st.session_state.df.rename(columns=column_names)
+                
+                # 수집된 데이터 즉시 표시
+                st.write("수집된 데이터:")
+                st.dataframe(st.session_state.df, height=400)
+                
+                # 시각화 생성 및 표시
+                st.session_state.fig_price = create_visualizations(st.session_state.df)
+                st.plotly_chart(st.session_state.fig_price)
+                
+                # AI 분석 시작
+                with st.spinner('AI 분석을 수행중입니다...'):
+                    analysis_result = analyze_with_openai(st.session_state.df)
+                    st.session_state.analysis_text = analysis_result
+                    
+                    # AI 분석 결과 표시
+                    st.subheader("AI 분석 결과")
+                    st.write(analysis_result)
+        except Exception as e:
+            st.error(f"스크래핑 중 오류 발생: {str(e)}")
+        finally:
+            st.session_state.scraping_in_progress = False
 
     # 초기화 버튼
     if st.session_state.df is not None:
